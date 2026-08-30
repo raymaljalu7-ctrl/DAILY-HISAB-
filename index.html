@@ -88,7 +88,24 @@ th,td{padding:7px;border-bottom:1px solid #ddd;text-align:left}
 </head>
 
 <body>
+<div id="loginScreen" style="display:none;padding:25px;max-width:450px;margin:auto">
+  <div class="box">
+    <h2>🔐 Daily Hisab Login</h2>
+    <p class="small">Sign in to your Jalu Bakery account</p>
 
+    <label>Email</label>
+    <input id="loginEmail" type="email" placeholder="Owner email">
+
+    <label>Password</label>
+    <input id="loginPassword" type="password" placeholder="Password">
+
+    <button class="primary" onclick="loginUser()">
+      Login
+    </button>
+
+    <p id="loginMessage" style="color:#dc3545"></p>
+  </div>
+</div>
 <header>
 <h1>Daily Hisab</h1>
 <div>Complete Business Accounts</div>
