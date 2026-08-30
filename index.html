@@ -1427,6 +1427,52 @@ today();
 refresh();
 
 </script>
+  <script>
+async function loginUser() {
+  const email = document.getElementById("loginEmail").value.trim();
+  const password = document.getElementById("loginPassword").value;
+  const message = document.getElementById("loginMessage");
+
+  if (!email || !password) {
+    message.textContent = "Please enter email and password.";
+    return;
+  }
+
+  try {
+    await window.dailyHisabFirebase.signInWithEmailAndPassword(
+      window.dailyHisabFirebase.auth,
+      email,
+      password
+    );
+  } catch (error) {
+    console.error(error);
+    message.textContent = "Login failed. Check your email and password.";
+  }
+}
+
+window.dailyHisabFirebase.onAuthStateChanged(
+  window.dailyHisabFirebase.auth,
+  function(user) {
+
+    const login = document.getElementById("loginScreen");
+    const header = document.querySelector("header");
+    const nav = document.querySelector("nav");
+    const main = document.querySelector("main");
+
+    if (user) {
+      login.style.display = "none";
+      if (header) header.style.display = "";
+      if (nav) nav.style.display = "";
+      if (main) main.style.display = "";
+    } else {
+      login.style.display = "block";
+      if (header) header.style.display = "none";
+      if (nav) nav.style.display = "none";
+      if (main) main.style.display = "none";
+    }
+  }
+);
+
 <script>
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", function () {
