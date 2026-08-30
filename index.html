@@ -2,124 +2,38 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#198754">
 <title>Daily Hisab</title>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
 <style>
 *{box-sizing:border-box}
-body{
-  margin:0;
-  font-family:Arial,sans-serif;
-  background:#f5f7f9;
-  color:#222;
-}
-header{
-  background:#198754;
-  color:white;
-  text-align:center;
-  padding:18px 10px;
-}
-header h1{margin:0 0 5px}
-nav{
-  display:flex;
-  background:white;
-  position:sticky;
-  top:0;
-  z-index:10;
-  box-shadow:0 1px 5px #ccc;
-}
-nav button{
-  flex:1;
-  padding:14px 4px;
-  border:0;
-  background:white;
-  font-weight:bold;
-}
-nav button.active{
-  color:#198754;
-  border-bottom:3px solid #198754;
-}
-main{
-  max-width:700px;
-  margin:auto;
-  padding:15px;
-}
-.page{display:none}
-.page.active{display:block}
-
-.cards{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:10px;
-}
-.card{
-  background:white;
-  padding:16px;
-  border-radius:12px;
-  box-shadow:0 1px 5px #ddd;
-}
-.card b{
-  display:block;
-  font-size:21px;
-  margin-top:7px;
-}
-.income{color:#198754}
-.expense{color:#dc3545}
-.receivable{color:#0d6efd}
-.payable{color:#fd7e14}
-
-form,.box{
-  background:white;
-  padding:16px;
-  margin-bottom:15px;
-  border-radius:12px;
-  box-shadow:0 1px 5px #ddd;
-}
-label{
-  display:block;
-  margin-top:12px;
-  margin-bottom:5px;
-  font-weight:bold;
-}
-input,select,textarea{
-  width:100%;
-  padding:12px;
-  border:1px solid #ccc;
-  border-radius:8px;
-  font-size:16px;
-}
-button.primary{
-  margin-top:15px;
-  padding:12px 18px;
-  border:0;
-  border-radius:8px;
-  background:#198754;
-  color:white;
-  font-weight:bold;
-}
-.entry{
-  background:white;
-  padding:13px;
-  margin:9px 0;
-  border-radius:10px;
-  box-shadow:0 1px 4px #ddd;
-}
-.row{
-  display:flex;
-  justify-content:space-between;
-  gap:10px;
-}
-.small{
-  color:#777;
-  font-size:13px;
-  margin-top:5px;
-}
-.empty{
-  text-align:center;
-  color:#777;
-  padding:20px;
-}
+body{margin:0;font-family:Arial,sans-serif;background:#f5f7f9;color:#222}
+header{background:#198754;color:white;padding:16px;text-align:center}
+header h1{margin:0}
+nav{display:flex;overflow-x:auto;background:white;position:sticky;top:0;z-index:10;box-shadow:0 1px 5px #ccc}
+nav button{min-width:105px;padding:13px 5px;border:0;background:white;font-weight:bold}
+nav button.active{color:#198754;border-bottom:3px solid #198754}
+main{max-width:850px;margin:auto;padding:14px}
+.page{display:none}.page.active{display:block}
+.cards{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.card,.box,.entry{background:white;padding:14px;border-radius:12px;box-shadow:0 1px 5px #ddd;margin-bottom:10px}
+.card b{display:block;font-size:20px;margin-top:6px}
+.income{color:#198754}.expense{color:#dc3545}
+.receivable{color:#0d6efd}.payable{color:#fd7e14}
+label{display:block;font-weight:bold;margin:10px 0 5px}
+input,select,textarea{width:100%;padding:11px;border:1px solid #ccc;border-radius:8px;font-size:16px}
+button.primary{background:#198754;color:white;border:0;padding:11px 16px;border-radius:8px;font-weight:bold;margin-top:12px}
+button.danger{background:#dc3545;color:white;border:0;padding:7px 10px;border-radius:7px}
+button.secondary{background:#eee;border:0;padding:9px;border-radius:7px;margin-top:8px}
+.row{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.small{font-size:13px;color:#777}
+.empty{text-align:center;padding:20px;color:#777}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:7px;border-bottom:1px solid #ddd;text-align:left}
+.stat{display:flex;justify-content:space-between;padding:7px 0}
 </style>
 </head>
 
@@ -127,19 +41,23 @@ button.primary{
 
 <header>
 <h1>Daily Hisab</h1>
-<div>Income • Expense • Party Accounts</div>
+<div>Complete Business Accounts</div>
 </header>
 
 <nav>
-<button class="active" onclick="openPage('home',this)">🏠 Home</button>
-<button onclick="openPage('entry',this)">➕ Entry</button>
-<button onclick="openPage('party',this)">👥 Parties</button>
-<button onclick="openPage('report',this)">📊 Reports</button>
+<button class="active" onclick="page('home',this)">🏠 Home</button>
+<button onclick="page('transactions',this)">💰 Transactions</button>
+<button onclick="page('parties',this)">👥 Parties</button>
+<button onclick="page('employees',this)">👨‍🔧 Employees</button>
+<button onclick="page('production',this)">🏭 Production</button>
+<button onclick="page('reports',this)">📊 Reports</button>
+<button onclick="page('backup',this)">💾 Backup</button>
 </nav>
 
 <main>
 
-<!-- HOME -->
+<!-- DASHBOARD -->
+
 <section id="home" class="page active">
 
 <h2>Dashboard</h2>
@@ -148,17 +66,27 @@ button.primary{
 
 <div class="card income">
 Income
-<b id="totalIncome">₹0</b>
+<b id="income">₹0</b>
 </div>
 
 <div class="card expense">
 Expense
-<b id="totalExpense">₹0</b>
+<b id="expense">₹0</b>
 </div>
 
 <div class="card">
 Balance
 <b id="balance">₹0</b>
+</div>
+
+<div class="card">
+Cash
+<b id="cash">₹0</b>
+</div>
+
+<div class="card">
+Bank
+<b id="bank">₹0</b>
 </div>
 
 <div class="card receivable">
@@ -171,60 +99,102 @@ Payable
 <b id="payable">₹0</b>
 </div>
 
+<div class="card">
+Production
+<b id="production">0</b>
 </div>
 
-<h2>Recent Entries</h2>
-<div id="recentEntries"></div>
+</div>
+
+<h2>Recent Transactions</h2>
+<div id="recent"></div>
 
 </section>
 
 
-<!-- ENTRY -->
-<section id="entry" class="page">
+<!-- TRANSACTIONS -->
 
-<h2>Add Entry</h2>
+<section id="transactions" class="page">
 
-<form id="entryForm">
+<h2>Transaction Entry</h2>
+
+<form id="transactionForm" class="box">
 
 <label>Date</label>
-<input type="date" id="entryDate" required>
+<input id="tDate" type="date" required>
 
-<label>Type</label>
-<select id="entryType">
+<label>Transaction Type</label>
+
+<select id="tType">
+
 <option value="income">Income</option>
 <option value="expense">Expense</option>
-<option value="receivable">Receivable</option>
-<option value="payable">Payable</option>
+
+<option value="sale_credit">
+Credit Sale / Receivable
+</option>
+
+<option value="purchase_credit">
+Credit Purchase / Payable
+</option>
+
+<option value="receive">Payment Received</option>
+<option value="pay">Payment Paid</option>
+
 </select>
 
-<label>Party Name</label>
-<input type="text" id="entryParty" placeholder="Optional">
+<label>Party</label>
+
+<select id="tParty">
+<option value="">-- Select Party --</option>
+</select>
 
 <label>Amount</label>
-<input type="number" id="entryAmount" min="0" required>
+<input id="tAmount" type="number" min="0" step="0.01" required>
+
+<label>Payment Mode</label>
+
+<select id="tMode">
+<option value="cash">Cash</option>
+<option value="bank">Bank</option>
+</select>
+
+<label>Bank Account</label>
+<input id="tBank" placeholder="SBI / HDFC / BOB etc.">
 
 <label>Description</label>
-<textarea id="entryNote" rows="3"></textarea>
+<textarea id="tNote"></textarea>
 
-<button class="primary">Save Entry</button>
+<button class="primary">Save Transaction</button>
 
 </form>
+
+<h2>Transactions</h2>
+
+<div id="transactionList"></div>
 
 </section>
 
 
 <!-- PARTIES -->
-<section id="party" class="page">
 
-<h2>Party Accounts</h2>
+<section id="parties" class="page">
 
-<form id="partyForm">
+<h2>Party Master</h2>
+
+<form id="partyForm" class="box">
 
 <label>Party Name</label>
-<input type="text" id="partyName" required>
+<input id="pName" required>
 
-<label>Mobile Number</label>
-<input type="tel" id="partyMobile">
+<label>Mobile</label>
+<input id="pMobile">
+
+<label>Opening Receivable</label>
+<input id="pReceivable" type="number" step="0.01" value="0">
+
+<label>Opening Payable</label>
+<input id="pPayable" type="number" step="0.01" value="0">
 
 <button class="primary">Add Party</button>
 
@@ -235,21 +205,158 @@ Payable
 </section>
 
 
-<!-- REPORT -->
-<section id="report" class="page">
+<!-- EMPLOYEES -->
+
+<section id="employees" class="page">
+
+<h2>Employee Master</h2>
+
+<form id="employeeForm" class="box">
+
+<label>Employee Name</label>
+<input id="eName" required>
+
+<label>Mobile</label>
+<input id="eMobile">
+
+<label>Salary</label>
+<input id="eSalary" type="number" step="0.01">
+
+<label>Salary Type</label>
+
+<select id="eSalaryType">
+<option>Monthly</option>
+<option>Daily</option>
+</select>
+
+<button class="primary">Add Employee</button>
+
+</form>
+
+
+<h2>Salary / Advance</h2>
+
+<form id="paymentForm" class="box">
+
+<label>Date</label>
+<input id="payDate" type="date" required>
+
+<label>Employee</label>
+
+<select id="payEmployee" required>
+<option value="">-- Select Employee --</option>
+</select>
+
+<label>Payment Type</label>
+
+<select id="payType">
+<option value="salary">Salary</option>
+<option value="advance">Advance</option>
+<option value="adjustment">Advance Adjustment</option>
+</select>
+
+<label>Amount</label>
+<input id="payAmount" type="number" min="0" required>
+
+<label>Payment Mode</label>
+
+<select id="payMode">
+<option>Cash</option>
+<option>Bank</option>
+</select>
+
+<button class="primary">Save Payment</button>
+
+</form>
+
+<div id="employeeList"></div>
+
+</section>
+
+
+<!-- PRODUCTION -->
+
+<section id="productionPage" class="page">
+
+<h2>Daily Production</h2>
+
+<form id="productionForm" class="box">
+
+<label>Date</label>
+<input id="prodDate" type="date" required>
+
+<label>Product</label>
+<input id="prodProduct" required>
+
+<label>Quantity</label>
+<input id="prodQty" type="number" step="0.01" required>
+
+<label>Unit</label>
+<input id="prodUnit" placeholder="kg / pcs / box">
+
+<label>Production Value</label>
+<input id="prodValue" type="number" step="0.01">
+
+<label>Employee / Worker</label>
+
+<select id="prodEmployee">
+<option value="">-- Optional --</option>
+</select>
+
+<label>Note</label>
+<input id="prodNote">
+
+<button class="primary">Save Production</button>
+
+</form>
+
+<div id="productionList"></div>
+
+</section>
+
+
+<!-- REPORTS -->
+
+<section id="reports" class="page">
 
 <h2>Reports</h2>
 
 <div class="box">
 
 <label>From Date</label>
-<input type="date" id="fromDate">
+<input id="fromDate" type="date">
 
 <label>To Date</label>
-<input type="date" id="toDate">
+<input id="toDate" type="date">
+
+<label>Report Type</label>
+
+<select id="reportType">
+
+<option value="summary">Financial Summary</option>
+<option value="transactions">Transactions</option>
+<option value="party">Party Ledger</option>
+<option value="employees">Employee Report</option>
+<option value="production">Production Report</option>
+
+</select>
+
+<label>Party</label>
+
+<select id="reportParty">
+<option value="">All Parties</option>
+</select>
 
 <button class="primary" onclick="generateReport()">
 Generate Report
+</button>
+
+<button class="primary" onclick="downloadPDF()">
+📄 Download PDF
+</button>
+
+<button class="secondary" onclick="shareReport()">
+📤 Share Report
 </button>
 
 </div>
@@ -258,62 +365,175 @@ Generate Report
 
 </section>
 
+
+<!-- BACKUP -->
+
+<section id="backup" class="page">
+
+<h2>Backup & Restore</h2>
+
+<div class="box">
+
+<p>
+Always keep a backup of your Daily Hisab data.
+</p>
+
+<button class="primary" onclick="backupData()">
+💾 Download Backup
+</button>
+
+<br>
+
+<input id="restoreFile" type="file" accept=".json"
+style="margin-top:15px">
+
+<button class="primary" onclick="restoreData()">
+♻️ Restore Backup
+</button>
+
+</div>
+
+</section>
+
 </main>
 
 
 <script>
 
+const KEY="DAILY_HISAB_FINAL";
+
 let data=JSON.parse(
-localStorage.getItem("dailyHisab") ||
-'{"entries":[],"parties":[]}'
+localStorage.getItem(KEY) ||
+'{"transactions":[],"parties":[],"employees":[],"payments":[],"production":[]}'
 );
 
-function saveData(){
-localStorage.setItem("dailyHisab",JSON.stringify(data));
+
+function save(){
+
+localStorage.setItem(
+KEY,
+JSON.stringify(data)
+);
+
 refresh();
+
 }
 
-function money(value){
-return "₹"+Number(value||0).toLocaleString("en-IN",{
+
+function money(n){
+
+return "₹"+Number(n||0).toLocaleString(
+"en-IN",
+{
 minimumFractionDigits:2,
 maximumFractionDigits:2
 });
+
 }
 
-function openPage(id,button){
+
+function today(){
+
+return new Date().toISOString().slice(0,10);
+
+}
+
+
+function safe(x){
+
+return String(x??"").replace(
+/[&<>"']/g,
+c=>({
+"&":"&amp;",
+"<":"&lt;",
+">":"&gt;",
+'"':"&quot;",
+"'":"&#039;"
+}[c])
+);
+
+}
+
+
+function page(id,button){
+
+/*
+Production has a different HTML id because
+"production" is already used by the data section.
+*/
+
+if(id==="production"){
+id="productionPage";
+}
 
 document.querySelectorAll(".page")
-.forEach(p=>p.classList.remove("active"));
+.forEach(x=>x.classList.remove("active"));
 
 document.getElementById(id)
 .classList.add("active");
 
 document.querySelectorAll("nav button")
-.forEach(b=>b.classList.remove("active"));
+.forEach(x=>x.classList.remove("active"));
 
 button.classList.add("active");
 
-if(id==="report"){
-generateReport();
-}
+refresh();
 
 }
 
-function calculate(entries=data.entries){
+
+function totals(){
 
 let income=0;
 let expense=0;
 let receivable=0;
 let payable=0;
+let cash=0;
+let bank=0;
 
-entries.forEach(e=>{
+data.transactions.forEach(t=>{
 
-let amount=Number(e.amount);
+let a=Number(t.amount);
 
-if(e.type==="income") income+=amount;
-if(e.type==="expense") expense+=amount;
-if(e.type==="receivable") receivable+=amount;
-if(e.type==="payable") payable+=amount;
+if(t.type==="income"){
+income+=a;
+
+if(t.mode==="cash")cash+=a;
+else bank+=a;
+}
+
+if(t.type==="expense"){
+expense+=a;
+
+if(t.mode==="cash")cash-=a;
+else bank-=a;
+}
+
+if(t.type==="sale_credit"){
+receivable+=a;
+}
+
+if(t.type==="purchase_credit"){
+payable+=a;
+}
+
+if(t.type==="receive"){
+
+receivable-=a;
+
+if(t.mode==="cash")cash+=a;
+else bank+=a;
+
+}
+
+if(t.type==="pay"){
+
+payable-=a;
+
+if(t.mode==="cash")cash-=a;
+else bank-=a;
+
+}
 
 });
 
@@ -322,6 +542,8 @@ income,
 expense,
 receivable,
 payable,
+cash,
+bank,
 balance:income-expense
 };
 
@@ -330,91 +552,153 @@ balance:income-expense
 
 function refresh(){
 
-let t=calculate();
+let t=totals();
 
-document.getElementById("totalIncome").textContent=money(t.income);
-document.getElementById("totalExpense").textContent=money(t.expense);
-document.getElementById("balance").textContent=money(t.balance);
-document.getElementById("receivable").textContent=money(t.receivable);
-document.getElementById("payable").textContent=money(t.payable);
+income.textContent=money(t.income);
+expense.textContent=money(t.expense);
+balance.textContent=money(t.balance);
+cash.textContent=money(t.cash);
+bank.textContent=money(t.bank);
+receivable.textContent=money(t.receivable);
+payable.textContent=money(t.payable);
+
+production.textContent=
+data.production.reduce(
+(s,p)=>s+Number(p.qty||0),0
+);
 
 
-let recent=document.getElementById("recentEntries");
+tParty.innerHTML=
+'<option value="">-- Select Party --</option>'+
+data.parties.map(p=>
+`<option value="${safe(p.name)}">${safe(p.name)}</option>`
+).join("");
 
-let entries=data.entries.slice().reverse().slice(0,10);
 
-if(entries.length===0){
+reportParty.innerHTML=
+'<option value="">All Parties</option>'+
+data.parties.map(p=>
+`<option value="${safe(p.name)}">${safe(p.name)}</option>`
+).join("");
+
+
+payEmployee.innerHTML=
+'<option value="">-- Select Employee --</option>'+
+data.employees.map(e=>
+`<option>${safe(e.name)}</option>`
+).join("");
+
+
+prodEmployee.innerHTML=
+'<option value="">-- Optional --</option>'+
+data.employees.map(e=>
+`<option>${safe(e.name)}</option>`
+).join("");
+
 
 recent.innerHTML=
-'<div class="empty">No entries yet</div>';
-
-}else{
-
-recent.innerHTML=entries.map(e=>`
-
+data.transactions
+.slice()
+.reverse()
+.slice(0,8)
+.map(t=>
+`
 <div class="entry">
 
 <div class="row">
 
-<b>${e.type.toUpperCase()}</b>
+<b>${safe(t.type)}</b>
 
-<b>${money(e.amount)}</b>
+<b>${money(t.amount)}</b>
 
 </div>
 
-<div>${escapeText(e.party||"No party")}</div>
+<div>${safe(t.party||"No party")}</div>
 
 <div class="small">
-${e.date} • ${escapeText(e.note||"")}
+${t.date} • ${safe(t.mode)}
 </div>
 
 </div>
+`
+).join("")
+||
+'<div class="empty">No transactions</div>';
 
-`).join("");
 
-}
+transactionList.innerHTML=
+data.transactions
+.slice()
+.reverse()
+.map((t,i)=>
+`
+<div class="entry">
 
+<div class="row">
 
-let partyList=document.getElementById("partyList");
+<b>${t.date}</b>
 
-if(data.parties.length===0){
+<button class="danger"
+onclick="deleteTransaction(${data.transactions.length-1-i})">
+Delete
+</button>
+
+</div>
+
+<div>
+${safe(t.type)} •
+${safe(t.party||"No party")} •
+${money(t.amount)}
+</div>
+
+<div class="small">
+${safe(t.mode)}
+${t.bank?" • "+safe(t.bank):""}
+</div>
+
+</div>
+`
+).join("")
+||
+'<div class="empty">No transactions</div>';
+
 
 partyList.innerHTML=
-'<div class="empty">No parties added</div>';
+data.parties.map((p,i)=>{
 
-}else{
+let r=Number(p.receivable||0);
+let q=Number(p.payable||0);
 
-partyList.innerHTML=data.parties.map((p,i)=>{
+data.transactions.forEach(t=>{
 
-let r=0;
-let pay=0;
+if(t.party!==p.name)return;
 
-data.entries.forEach(e=>{
+if(t.type==="sale_credit")r+=Number(t.amount);
 
-if(e.party===p.name && e.type==="receivable")
-r+=Number(e.amount);
+if(t.type==="receive")r-=Number(t.amount);
 
-if(e.party===p.name && e.type==="payable")
-pay+=Number(e.amount);
+if(t.type==="purchase_credit")q+=Number(t.amount);
+
+if(t.type==="pay")q-=Number(t.amount);
 
 });
 
-return `
-
+return`
 <div class="entry">
 
 <div class="row">
 
-<b>${escapeText(p.name)}</b>
+<b>${safe(p.name)}</b>
 
-<button onclick="deleteParty(${i})">
+<button class="danger"
+onclick="deleteParty(${i})">
 Delete
 </button>
 
 </div>
 
 <div class="small">
-${escapeText(p.mobile||"")}
+${safe(p.mobile)}
 </div>
 
 <p class="receivable">
@@ -422,142 +706,339 @@ Receivable: ${money(r)}
 </p>
 
 <p class="payable">
-Payable: ${money(pay)}
+Payable: ${money(q)}
 </p>
 
-</div>
+<button class="secondary"
+onclick="partyReport('${encodeURIComponent(p.name)}')">
+📒 View Ledger
+</button>
 
+</div>
 `;
 
-}).join("");
-
-}
-
-}
+}).join("")
+||
+'<div class="empty">No parties</div>';
 
 
-function escapeText(text){
+employeeList.innerHTML=
+data.employees.map((e,i)=>{
 
-return String(text).replace(/[&<>"']/g,function(c){
+let salary=0;
+let advance=0;
+let adjustment=0;
 
-return {
-"&":"&amp;",
-"<":"&lt;",
-">":"&gt;",
-'"':"&quot;",
-"'":"&#039;"
+data.payments.forEach(p=>{
 
-}[c];
+if(p.employee!==e.name)return;
+
+if(p.type==="salary")salary+=Number(p.amount);
+
+if(p.type==="advance")advance+=Number(p.amount);
+
+if(p.type==="adjustment")adjustment+=Number(p.amount);
 
 });
 
+return`
+<div class="entry">
+
+<div class="row">
+
+<b>${safe(e.name)}</b>
+
+<button class="danger"
+onclick="deleteEmployee(${i})">
+Delete
+</button>
+
+</div>
+
+<div class="small">
+Salary: ${money(e.salary)} • ${safe(e.salaryType)}
+</div>
+
+<div>
+Salary Paid: ${money(salary)}
+</div>
+
+<div>
+Advance Outstanding: ${money(advance-adjustment)}
+</div>
+
+</div>
+`;
+
+}).join("")
+||
+'<div class="empty">No employees</div>';
+
+
+productionList.innerHTML=
+data.production
+.slice()
+.reverse()
+.map(p=>
+`
+<div class="entry">
+
+<b>${safe(p.date)} • ${safe(p.product)}</b>
+
+<div>
+${p.qty} ${safe(p.unit)}
+</div>
+
+<div>
+Value: ${money(p.value)}
+</div>
+
+<div class="small">
+${safe(p.employee)}
+</div>
+
+</div>
+`
+).join("")
+||
+'<div class="empty">No production records</div>';
+
 }
 
 
-document.getElementById("entryForm")
-.addEventListener("submit",function(e){
+transactionForm.onsubmit=function(e){
 
 e.preventDefault();
 
-data.entries.push({
+data.transactions.push({
 
-date:document.getElementById("entryDate").value,
-
-type:document.getElementById("entryType").value,
-
-party:document.getElementById("entryParty").value.trim(),
-
-amount:Number(document.getElementById("entryAmount").value),
-
-note:document.getElementById("entryNote").value.trim()
+date:tDate.value,
+type:tType.value,
+party:tParty.value,
+amount:Number(tAmount.value),
+mode:tMode.value,
+bank:tBank.value,
+note:tNote.value
 
 });
 
 this.reset();
 
-document.getElementById("entryDate").value=
-new Date().toISOString().slice(0,10);
+tDate.value=today();
 
-saveData();
+save();
 
-alert("Entry saved successfully!");
+alert("Transaction saved");
 
-});
+};
 
 
-document.getElementById("partyForm")
-.addEventListener("submit",function(e){
+partyForm.onsubmit=function(e){
 
 e.preventDefault();
 
 data.parties.push({
 
-name:document.getElementById("partyName").value.trim(),
-
-mobile:document.getElementById("partyMobile").value.trim()
+name:pName.value.trim(),
+mobile:pMobile.value.trim(),
+receivable:Number(pReceivable.value||0),
+payable:Number(pPayable.value||0)
 
 });
 
 this.reset();
 
-saveData();
+save();
 
-alert("Party added successfully!");
+alert("Party added");
+
+};
+
+
+employeeForm.onsubmit=function(e){
+
+e.preventDefault();
+
+data.employees.push({
+
+name:eName.value.trim(),
+mobile:eMobile.value.trim(),
+salary:Number(eSalary.value||0),
+salaryType:eSalaryType.value
 
 });
 
+this.reset();
 
-function deleteParty(index){
+save();
+
+alert("Employee added");
+
+};
+
+
+paymentForm.onsubmit=function(e){
+
+e.preventDefault();
+
+data.payments.push({
+
+date:payDate.value,
+employee:payEmployee.value,
+type:payType.value,
+amount:Number(payAmount.value),
+mode:payMode.value
+
+});
+
+this.reset();
+
+payDate.value=today();
+
+save();
+
+alert("Employee payment saved");
+
+};
+
+
+productionForm.onsubmit=function(e){
+
+e.preventDefault();
+
+data.production.push({
+
+date:prodDate.value,
+product:prodProduct.value,
+qty:Number(prodQty.value),
+unit:prodUnit.value,
+value:Number(prodValue.value||0),
+employee:prodEmployee.value,
+note:prodNote.value
+
+});
+
+this.reset();
+
+prodDate.value=today();
+
+save();
+
+alert("Production saved");
+
+};
+
+
+function deleteTransaction(i){
+
+if(confirm("Delete this transaction?")){
+
+data.transactions.splice(i,1);
+
+save();
+
+}
+
+}
+
+
+function deleteParty(i){
 
 if(confirm("Delete this party?")){
 
-data.parties.splice(index,1);
+data.parties.splice(i,1);
 
-saveData();
+save();
 
 }
+
+}
+
+
+function deleteEmployee(i){
+
+if(confirm("Delete this employee?")){
+
+data.employees.splice(i,1);
+
+save();
+
+}
+
+}
+
+
+function filteredTransactions(){
+
+let f=fromDate.value;
+let to=toDate.value;
+let party=reportParty.value;
+
+return data.transactions.filter(t=>
+(!f||t.date>=f)&&
+(!to||t.date<=to)&&
+(!party||t.party===party)
+);
 
 }
 
 
 function generateReport(){
 
-let from=document.getElementById("fromDate").value;
-let to=document.getElementById("toDate").value;
+let list=filteredTransactions();
+let t={income:0,expense:0,receivable:0,payable:0,balance:0};
 
-let entries=data.entries.filter(e=>
-(!from || e.date>=from) &&
-(!to || e.date<=to)
-);
+list.forEach(x=>{
 
-let t=calculate(entries);
+let a=Number(x.amount);
 
-document.getElementById("reportResult").innerHTML=`
+if(x.type==="income")t.income+=a;
+if(x.type==="expense")t.expense+=a;
+if(x.type==="sale_credit")t.receivable+=a;
+if(x.type==="receive")t.receivable-=a;
+if(x.type==="purchase_credit")t.payable+=a;
+if(x.type==="pay")t.payable-=a;
 
+});
+
+t.balance=t.income-t.expense;
+
+let type=reportType.value;
+
+let html=
+`
 <div class="box">
 
-<h3>Report Summary</h3>
+<h3>Daily Hisab Report</h3>
 
-<p>Income:
-<b class="income">${money(t.income)}</b>
+<p>
+${fromDate.value||"All"} to ${toDate.value||"All"}
 </p>
+`;
 
-<p>Expense:
-<b class="expense">${money(t.expense)}</b>
-</p>
 
-<p>Balance:
-<b>${money(t.balance)}</b>
-</p>
+if(type==="summary"||type==="transactions"){
 
-<p>Receivable:
-<b class="receivable">${money(t.receivable)}</b>
-</p>
+html+=`
 
-<p>Payable:
-<b class="payable">${money(t.payable)}</b>
-</p>
+<div class="stat">
+Income <b class="income">${money(t.income)}</b>
+</div>
 
+<div class="stat">
+Expense <b class="expense">${money(t.expense)}</b>
+</div>
+
+<div class="stat">
+Balance <b>${money(t.balance)}</b>
+</div>
+
+<div class="stat">
+Receivable <b class="receivable">${money(t.receivable)}</b>
+</div>
+
+<div class="stat">
+Payable <b class="payable">${money(t.payable)}</b>
 </div>
 
 `;
@@ -565,8 +1046,316 @@ document.getElementById("reportResult").innerHTML=`
 }
 
 
-document.getElementById("entryDate").value=
-new Date().toISOString().slice(0,10);
+if(type==="transactions"){
+
+html+=`
+
+<h3>Transactions</h3>
+
+<table>
+
+<tr>
+<th>Date</th>
+<th>Type</th>
+<th>Party</th>
+<th>Amount</th>
+<th>Mode</th>
+</tr>
+
+${
+list.map(x=>
+`
+<tr>
+<td>${x.date}</td>
+<td>${safe(x.type)}</td>
+<td>${safe(x.party)}</td>
+<td>${money(x.amount)}</td>
+<td>${safe(x.mode)}</td>
+</tr>
+`
+).join("")
+}
+
+</table>
+
+`;
+
+}
+
+
+if(type==="party"){
+
+let parties={};
+
+list.forEach(x=>{
+
+if(!x.party)return;
+
+parties[x.party]??={
+receivable:0,
+payable:0
+};
+
+if(x.type==="sale_credit")
+parties[x.party].receivable+=Number(x.amount);
+
+if(x.type==="receive")
+parties[x.party].receivable-=Number(x.amount);
+
+if(x.type==="purchase_credit")
+parties[x.party].payable+=Number(x.amount);
+
+if(x.type==="pay")
+parties[x.party].payable-=Number(x.amount);
+
+});
+
+html+="<h3>Party Outstanding</h3>";
+
+Object.keys(parties).forEach(p=>{
+
+html+=`
+
+<p>
+
+<b>${safe(p)}</b><br>
+
+Receivable:
+<span class="receivable">
+${money(parties[p].receivable)}
+</span>
+
+<br>
+
+Payable:
+<span class="payable">
+${money(parties[p].payable)}
+</span>
+
+</p>
+
+`;
+
+});
+
+}
+
+
+if(type==="employees"){
+
+html+="<h3>Employee Payments</h3>";
+
+data.payments.forEach(p=>{
+
+html+=`
+
+<p>
+${p.date} •
+${safe(p.employee)} •
+${safe(p.type)} •
+${money(p.amount)} •
+${safe(p.mode)}
+</p>
+
+`;
+
+});
+
+}
+
+
+if(type==="production"){
+
+html+="<h3>Production</h3>";
+
+data.production.forEach(p=>{
+
+html+=`
+
+<p>
+${p.date} •
+${safe(p.product)} •
+${p.qty} ${safe(p.unit)} •
+${money(p.value)}
+</p>
+
+`;
+
+});
+
+}
+
+
+html+="</div>";
+
+reportResult.innerHTML=html;
+
+}
+
+
+function partyReport(name){
+
+let n=decodeURIComponent(name);
+
+reportType.value="transactions";
+reportParty.value=n;
+
+page(
+"reports",
+document.querySelectorAll("nav button")[5]
+);
+
+generateReport();
+
+}
+
+
+function downloadPDF(){
+
+generateReport();
+
+if(!window.jspdf){
+
+alert("PDF library is not loaded. Please connect to internet once.");
+
+return;
+
+}
+
+const {jsPDF}=window.jspdf;
+
+let doc=new jsPDF();
+
+let y=18;
+
+doc.setFontSize(18);
+
+doc.text("Daily Hisab",14,y);
+
+y+=10;
+
+doc.setFontSize(10);
+
+let lines=reportResult.innerText.split("\n");
+
+lines.forEach(line=>{
+
+if(y>280){
+
+doc.addPage();
+
+y=15;
+
+}
+
+doc.text(
+line.substring(0,100),
+14,
+y
+);
+
+y+=6;
+
+});
+
+doc.save("Daily-Hisab-Report.pdf");
+
+}
+
+
+function shareReport(){
+
+generateReport();
+
+let text=
+"Daily Hisab Report\n"+
+reportResult.innerText;
+
+if(navigator.share){
+
+navigator.share({
+
+title:"Daily Hisab Report",
+text:text
+
+});
+
+}else{
+
+navigator.clipboard.writeText(text);
+
+alert("Report copied");
+
+}
+
+}
+
+
+function backupData(){
+
+let blob=new Blob(
+[JSON.stringify(data,null,2)],
+{type:"application/json"}
+);
+
+let url=URL.createObjectURL(blob);
+
+let a=document.createElement("a");
+
+a.href=url;
+
+a.download=
+"Daily-Hisab-Backup-"+today()+".json";
+
+a.click();
+
+URL.revokeObjectURL(url);
+
+}
+
+
+function restoreData(){
+
+let file=
+document.getElementById("restoreFile").files[0];
+
+if(!file){
+
+alert("Please select a backup file");
+
+return;
+
+}
+
+let reader=new FileReader();
+
+reader.onload=function(){
+
+try{
+
+data=JSON.parse(reader.result);
+
+save();
+
+alert("Backup restored successfully");
+
+}catch{
+
+alert("Invalid backup file");
+
+}
+
+};
+
+reader.readAsText(file);
+
+}
+
+
+tDate.value=
+payDate.value=
+prodDate.value=
+today();
 
 refresh();
 
