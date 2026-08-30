@@ -1,1 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#198754">
+<title>Daily Hisab</title>
 
+<style>
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:Arial,sans-serif;
+  background:#f5f7f9;
+  color:#222;
+}
+header{
+  background:#198754;
+  color:white;
+  text-align:center;
+  padding:18px 10px;
+}
+header h1{margin:0 0 5px}
+nav{
+  display:flex;
+  background:white;
+  position:sticky;
+  top:0;
+  z-index:10;
+  box-shadow:0 1px 5px #ccc;
+}
+nav button{
+  flex:1;
+  padding:14px 4px;
+  border:0;
+  background:white;
+  font-weight:bold;
+}
+nav button.active{
+  color:#198754;
+  border-bottom:3px solid #198754;
+}
+main{
+  max-width:700px;
+  margin:auto;
+  padding:15px;
+}
+.page{display:none}
+.page.active{display:block}
+
+.cards{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+.card{
+  background:white;
+  padding:16px;
+  border-radius:12px;
+  box-shadow:0 1px 5px #ddd;
+}
+.card b{
+  display:block;
+  font-size:21px;
+  margin-top:7px;
+}
+.income{color:#198754}
+.expense{color:#dc3545}
+.receivable{color:#0d6efd}
+.payable{color:#fd7e14}
+
+form,.box{
+  background:white;
+  padding:16px;
+  margin-bottom:15px;
+  border-radius:12px;
+  box-shadow:0 1px 5px #ddd;
+}
+label{
+  display:block;
+  margin-top:12px;
+  margin-bottom:5px;
+  font-weight:bold;
+}
+input,select,textarea{
+  width:100%;
+  padding:12px;
+  border:1px solid #ccc;
+  border-radius:8px;
+  font-size:16px;
+}
+button.primary{
+  margin-top:15px;
+  padding:12px 18px;
+  border:0;
+  border-radius:8px;
+  background:#198754;
+  color:white;
+  font-weight:bold;
+}
+.entry{
+  background:white;
+  padding:13px;
+  margin:9px 0;
+  border-radius:10px;
+  box-shadow:0 1px 4px #ddd;
+}
+.row{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+}
+.small{
+  color:#777;
+  font-size:13px;
+  margin-top:5px;
+}
+.empty{
+  text-align:center;
+  color:#777;
+  padding:20px;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+<h1>Daily Hisab</h1>
+<div>Income • Expense • Party Accounts</div>
+</header>
+
+<nav>
+<button class="active" onclick="openPage('home',this)">🏠 Home</button>
+<button onclick="openPage('entry',this)">➕ Entry</button>
+<button onclick="openPage('party',this)">👥 Parties</button>
+<button onclick="openPage('report',this)">📊 Reports</button>
+</nav>
+
+<main>
+
+<!-- HOME -->
+<section id="home" class="page active">
+
+<h2>Dashboard</h2>
+
+<div class="cards">
+
+<div class="card income">
+Income
+<b id="totalIncome">₹0</b>
+</div>
+
+<div class="card expense">
+Expense
+<b id="totalExpense">₹0</b>
+</div>
+
+<div class="card">
+Balance
+<b id="balance">₹0</b>
+</div>
+
+<div class="card receivable">
+Receivable
+<b id="receivable">₹0</b>
+</div>
+
+<div class="card payable">
+Payable
+<b id="payable">₹0</b>
+</div>
+
+</div>
+
+<h2>Recent Entries</h2>
+<div id="recentEntries"></div>
+
+</section>
+
+
+<!-- ENTRY -->
+<section id="entry" class="page">
+
+<h2>Add Entry</h2>
+
+<form id="entryForm">
+
+<label>Date</label>
+<input type="date" id="entryDate" required>
+
+<label>Type</label>
+<select id="entryType">
+<option value="income">Income</option>
+<option value="expense">Expense</option>
+<option value="receivable">Receivable</option>
+<option value="payable">Payable</option>
+</select>
+
+<label>Party Name</label>
+<input type="text" id="entryParty" placeholder="Optional">
+
+<label>Amount</label>
+<input type="number" id="entryAmount" min="0" required>
+
+<label>Description</label>
+<textarea id="entryNote" rows="3"></textarea>
+
+<button class="primary">Save Entry</button>
+
+</form>
+
+</section>
+
+
+<!-- PARTIES -->
+<section id="party" class="page">
+
+<h2>Party Accounts</h2>
+
+<form id="partyForm">
+
+<label>Party Name</label>
+<input type="text" id="partyName" required>
+
+<label>Mobile Number</label>
+<input type="tel" id="partyMobile">
+
+<button class="primary">Add Party</button>
+
+</form>
+
+<div id="partyList"></div>
+
+</section>
+
+
+<!-- REPORT -->
+<section id="report" class="page">
+
+<h2>Reports</h2>
+
+<div class="box">
+
+<label>From Date</label>
+<input type="date" id="fromDate">
+
+<label>To Date</label>
+<input type="date" id="toDate">
+
+<button class="primary" onclick="generateReport()">
+Generate Report
+</button>
+
+</div>
+
+<div id="reportResult"></div>
+
+</section>
+
+</main>
+
+
+<script>
+
+let data=JSON.parse(
+localStorage.getItem("dailyHisab") ||
+'{"entries":[],"parties":[]}'
+);
+
+function saveData(){
+localStorage.setItem("dailyHisab",JSON.stringify(data));
+refresh();
+}
+
+function money(value){
+return "₹"+Number(value||0).toLocaleString("en-IN",{
+minimumFractionDigits:2,
+maximumFractionDigits:2
+});
+}
+
+function openPage(id,button){
+
+document.querySelectorAll(".page")
+.forEach(p=>p.classList.remove("active"));
+
+document.getElementById(id)
+.classList.add("active");
+
+document.querySelectorAll("nav button")
+.forEach(b=>b.classList.remove("active"));
+
+button.classList.add("active");
+
+if(id==="report"){
+generateReport();
+}
+
+}
+
+function calculate(entries=data.entries){
+
+let income=0;
+let expense=0;
+let receivable=0;
+let payable=0;
+
+entries.forEach(e=>{
+
+let amount=Number(e.amount);
+
+if(e.type==="income") income+=amount;
+if(e.type==="expense") expense+=amount;
+if(e.type==="receivable") receivable+=amount;
+if(e.type==="payable") payable+=amount;
+
+});
+
+return{
+income,
+expense,
+receivable,
+payable,
+balance:income-expense
+};
+
+}
+
+
+function refresh(){
+
+let t=calculate();
+
+document.getElementById("totalIncome").textContent=money(t.income);
+document.getElementById("totalExpense").textContent=money(t.expense);
+document.getElementById("balance").textContent=money(t.balance);
+document.getElementById("receivable").textContent=money(t.receivable);
+document.getElementById("payable").textContent=money(t.payable);
+
+
+let recent=document.getElementById("recentEntries");
+
+let entries=data.entries.slice().reverse().slice(0,10);
+
+if(entries.length===0){
+
+recent.innerHTML=
+'<div class="empty">No entries yet</div>';
+
+}else{
+
+recent.innerHTML=entries.map(e=>`
+
+<div class="entry">
+
+<div class="row">
+
+<b>${e.type.toUpperCase()}</b>
+
+<b>${money(e.amount)}</b>
+
+</div>
+
+<div>${escapeText(e.party||"No party")}</div>
+
+<div class="small">
+${e.date} • ${escapeText(e.note||"")}
+</div>
+
+</div>
+
+`).join("");
+
+}
+
+
+let partyList=document.getElementById("partyList");
+
+if(data.parties.length===0){
+
+partyList.innerHTML=
+'<div class="empty">No parties added</div>';
+
+}else{
+
+partyList.innerHTML=data.parties.map((p,i)=>{
+
+let r=0;
+let pay=0;
+
+data.entries.forEach(e=>{
+
+if(e.party===p.name && e.type==="receivable")
+r+=Number(e.amount);
+
+if(e.party===p.name && e.type==="payable")
+pay+=Number(e.amount);
+
+});
+
+return `
+
+<div class="entry">
+
+<div class="row">
+
+<b>${escapeText(p.name)}</b>
+
+<button onclick="deleteParty(${i})">
+Delete
+</button>
+
+</div>
+
+<div class="small">
+${escapeText(p.mobile||"")}
+</div>
+
+<p class="receivable">
+Receivable: ${money(r)}
+</p>
+
+<p class="payable">
+Payable: ${money(pay)}
+</p>
+
+</div>
+
+`;
+
+}).join("");
+
+}
+
+}
+
+
+function escapeText(text){
+
+return String(text).replace(/[&<>"']/g,function(c){
+
+return {
+"&":"&amp;",
+"<":"&lt;",
+">":"&gt;",
+'"':"&quot;",
+"'":"&#039;"
+
+}[c];
+
+});
+
+}
+
+
+document.getElementById("entryForm")
+.addEventListener("submit",function(e){
+
+e.preventDefault();
+
+data.entries.push({
+
+date:document.getElementById("entryDate").value,
+
+type:document.getElementById("entryType").value,
+
+party:document.getElementById("entryParty").value.trim(),
+
+amount:Number(document.getElementById("entryAmount").value),
+
+note:document.getElementById("entryNote").value.trim()
+
+});
+
+this.reset();
+
+document.getElementById("entryDate").value=
+new Date().toISOString().slice(0,10);
+
+saveData();
+
+alert("Entry saved successfully!");
+
+});
+
+
+document.getElementById("partyForm")
+.addEventListener("submit",function(e){
+
+e.preventDefault();
+
+data.parties.push({
+
+name:document.getElementById("partyName").value.trim(),
+
+mobile:document.getElementById("partyMobile").value.trim()
+
+});
+
+this.reset();
+
+saveData();
+
+alert("Party added successfully!");
+
+});
+
+
+function deleteParty(index){
+
+if(confirm("Delete this party?")){
+
+data.parties.splice(index,1);
+
+saveData();
+
+}
+
+}
+
+
+function generateReport(){
+
+let from=document.getElementById("fromDate").value;
+let to=document.getElementById("toDate").value;
+
+let entries=data.entries.filter(e=>
+(!from || e.date>=from) &&
+(!to || e.date<=to)
+);
+
+let t=calculate(entries);
+
+document.getElementById("reportResult").innerHTML=`
+
+<div class="box">
+
+<h3>Report Summary</h3>
+
+<p>Income:
+<b class="income">${money(t.income)}</b>
+</p>
+
+<p>Expense:
+<b class="expense">${money(t.expense)}</b>
+</p>
+
+<p>Balance:
+<b>${money(t.balance)}</b>
+</p>
+
+<p>Receivable:
+<b class="receivable">${money(t.receivable)}</b>
+</p>
+
+<p>Payable:
+<b class="payable">${money(t.payable)}</b>
+</p>
+
+</div>
+
+`;
+
+}
+
+
+document.getElementById("entryDate").value=
+new Date().toISOString().slice(0,10);
+
+refresh();
+
+</script>
+
+</body>
+  </html>
