@@ -7,7 +7,57 @@
 <title>Daily Hisab</title>
 <link rel="manifest" href="manifest.json">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script type="module">
+import { initializeApp }
+from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
 
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  onAuthStateChanged,
+  signOut
+}
+from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
+
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  getDocs,
+  query,
+  where,
+  serverTimestamp
+}
+from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBR7zDhLXHp8-sjIE1ibZ37SQgn2PQLwXk",
+  authDomain: "jalu-bakery-daily-hisab.firebaseapp.com",
+  projectId: "jalu-bakery-daily-hisab",
+  storageBucket: "jalu-bakery-daily-hisab.firebasestorage.app",
+  messagingSenderId: "887651742802",
+  appId: "1:887651742802:web:f0521ad6fb0adfcf3ddb8b"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+window.dailyHisabFirebase = {
+  app,
+  auth,
+  db,
+  signInWithEmailAndPassword,
+  onAuthStateChanged,
+  signOut,
+  collection,
+  addDoc,
+  getDocs,
+  query,
+  where,
+  serverTimestamp
+};
+</script>
 <style>
 *{box-sizing:border-box}
 body{margin:0;font-family:Arial,sans-serif;background:#f5f7f9;color:#222}
