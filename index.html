@@ -1427,8 +1427,7 @@ today();
 refresh();
 
 </script>
-  <script>
-async function loginUser() {
+  
   const email = document.getElementById("loginEmail").value.trim();
   const password = document.getElementById("loginPassword").value;
   const message = document.getElementById("loginMessage");
@@ -1474,10 +1473,85 @@ window.dailyHisabFirebase.onAuthStateChanged(
 );
 
 <script>
+if <script>
+async function loginUser() {
+  const email = document.getElementById("loginEmail").value.trim();
+  const password = document.getElementById("loginPassword").value;
+  const message = document.getElementById("loginMessage");
+
+  if (!email || !password) {
+    message.textContent = "Please enter email and password.";
+    return;
+  }
+
+  if (!window.dailyHisabFirebase) {
+    message.textContent = "Firebase is still loading. Please try again.";
+    return;
+  }
+
+  try {
+    message.textContent = "Logging in...";
+
+    await window.dailyHisabFirebase.signInWithEmailAndPassword(
+      window.dailyHisabFirebase.auth,
+      email,
+      password
+    );
+
+    message.textContent = "";
+
+  } catch (error) {
+    console.error(error);
+    message.textContent = "Login failed. Check your email and password.";
+  }
+}
+
+function startLoginCheck() {
+  if (!window.dailyHisabFirebase) {
+    setTimeout(startLoginCheck, 300);
+    return;
+  }
+
+  window.dailyHisabFirebase.onAuthStateChanged(
+    window.dailyHisabFirebase.auth,
+    function(user) {
+
+      const loginScreen = document.getElementById("loginScreen");
+      const header = document.querySelector("header");
+      const nav = document.querySelector("nav");
+      const main = document.querySelector("main");
+
+      if (user) {
+        loginScreen.style.display = "none";
+
+        if (header) header.style.display = "";
+        if (nav) nav.style.display = "";
+        if (main) main.style.display = "";
+
+      } else {
+        loginScreen.style.display = "block";
+
+        if (header) header.style.display = "none";
+        if (nav) nav.style.display = "none";
+        if (main) main.style.display = "none";
+      }
+    }
+  );
+}
+
+startLoginCheck();
+</script>
+
+<script>
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", function () {
     navigator.serviceWorker.register("./sw.js");
   });
+}
+</script>
+
+</body>
+</html>
 }
 </script>
 </body>
