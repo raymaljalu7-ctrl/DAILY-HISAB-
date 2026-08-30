@@ -1,4 +1,4 @@
-const CACHE_NAME = "daily-hisab-v1";
+const CACHE_NAME = "daily-hisab-v2";
 
 const FILES = [
   "./",
