@@ -4,77 +4,85 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#198754">
-<meta name="apple-mobile-web-app-capable" content="yes">
 <title>Daily Hisab</title>
-
 <link rel="manifest" href="manifest.json">
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
 *{box-sizing:border-box}
+
 body{
- margin:0;
- font-family:Arial,sans-serif;
- background:#f5f7f9;
- color:#222;
+margin:0;
+font-family:Arial,sans-serif;
+background:#f5f7f9;
+color:#222;
 }
+
 header{
- background:#198754;
- color:white;
- padding:15px;
- text-align:center;
+background:#198754;
+color:white;
+padding:16px;
+text-align:center;
 }
-header h1{margin:0 0 5px}
-header small{opacity:.9}
+
+header h1{
+margin:0;
+}
 
 nav{
- display:flex;
- overflow-x:auto;
- background:white;
- position:sticky;
- top:0;
- z-index:20;
- box-shadow:0 1px 5px #ccc;
+display:flex;
+overflow-x:auto;
+background:white;
+position:sticky;
+top:0;
+z-index:10;
+box-shadow:0 1px 5px #ccc;
 }
+
 nav button{
- min-width:100px;
- padding:12px 7px;
- border:0;
- background:white;
- font-weight:bold;
+min-width:105px;
+padding:13px 5px;
+border:0;
+background:white;
+font-weight:bold;
 }
+
 nav button.active{
- color:#198754;
- border-bottom:3px solid #198754;
+color:#198754;
+border-bottom:3px solid #198754;
 }
 
 main{
- max-width:950px;
- margin:auto;
- padding:14px;
+max-width:900px;
+margin:auto;
+padding:14px;
 }
 
-.page{display:none}
-.page.active{display:block}
+.page{
+display:none;
+}
+
+.page.active{
+display:block;
+}
 
 .cards{
- display:grid;
- grid-template-columns:repeat(2,1fr);
- gap:10px;
+display:grid;
+grid-template-columns:repeat(2,1fr);
+gap:10px;
 }
+
 .card,.box,.entry{
- background:white;
- padding:14px;
- border-radius:12px;
- box-shadow:0 1px 5px #ddd;
- margin-bottom:10px;
+background:white;
+padding:14px;
+border-radius:12px;
+box-shadow:0 1px 5px #ddd;
+margin-bottom:10px;
 }
 
 .card b{
- display:block;
- font-size:21px;
- margin-top:6px;
+display:block;
+font-size:21px;
+margin-top:6px;
 }
 
 .income{color:#198754}
@@ -83,477 +91,481 @@ main{
 .payable{color:#fd7e14}
 
 label{
- display:block;
- font-weight:bold;
- margin:10px 0 5px;
+display:block;
+font-weight:bold;
+margin:10px 0 5px;
 }
 
 input,select,textarea{
- width:100%;
- padding:11px;
- border:1px solid #ccc;
- border-radius:8px;
- font-size:16px;
+width:100%;
+padding:11px;
+border:1px solid #ccc;
+border-radius:8px;
+font-size:16px;
 }
 
-textarea{min-height:80px}
-
-button{
- cursor:pointer;
+textarea{
+min-height:80px;
 }
 
 button.primary{
- background:#198754;
- color:white;
- border:0;
- padding:11px 16px;
- border-radius:8px;
- font-weight:bold;
- margin-top:12px;
+background:#198754;
+color:white;
+border:0;
+padding:11px 16px;
+border-radius:8px;
+font-weight:bold;
+margin-top:12px;
 }
 
 button.danger{
- background:#dc3545;
- color:white;
- border:0;
- padding:7px 10px;
- border-radius:7px;
+background:#dc3545;
+color:white;
+border:0;
+padding:7px 10px;
+border-radius:7px;
 }
 
 button.secondary{
- background:#eee;
- border:0;
- padding:9px;
- border-radius:7px;
- margin-top:8px;
-}
-
-button.blue{
- background:#0d6efd;
- color:white;
- border:0;
- padding:9px 13px;
- border-radius:7px;
+background:#eee;
+border:0;
+padding:9px;
+border-radius:7px;
+margin-top:8px;
 }
 
 .row{
- display:flex;
- justify-content:space-between;
- gap:10px;
- align-items:center;
+display:flex;
+justify-content:space-between;
+gap:10px;
+align-items:center;
 }
 
-.grid2{
- display:grid;
- grid-template-columns:1fr 1fr;
- gap:10px;
+.muted{
+color:#777;
 }
 
-.small{
- font-size:13px;
- color:#666;
+.hidden{
+display:none!important;
 }
 
-.hidden{display:none!important}
-
-.tablewrap{
- overflow-x:auto;
+.login-screen{
+min-height:100vh;
+display:flex;
+align-items:center;
+justify-content:center;
+padding:20px;
+background:#f5f7f9;
 }
 
-table{
- width:100%;
- border-collapse:collapse;
- background:white;
-}
-th,td{
- padding:9px;
- border-bottom:1px solid #ddd;
- text-align:left;
- white-space:nowrap;
-}
-th{
- background:#f0f2f4;
+.login-box{
+width:100%;
+max-width:400px;
+background:white;
+padding:25px;
+border-radius:16px;
+box-shadow:0 2px 12px #ccc;
 }
 
-#loginScreen{
- min-height:100vh;
- display:flex;
- align-items:center;
- justify-content:center;
- padding:20px;
- background:#f5f7f9;
+.login-box h1{
+text-align:center;
+color:#198754;
 }
 
-.loginBox{
- width:100%;
- max-width:420px;
- background:white;
- padding:25px;
- border-radius:15px;
- box-shadow:0 2px 12px #ccc;
+.login-message{
+color:#dc3545;
+margin-top:12px;
+text-align:center;
 }
 
-.badge{
- display:inline-block;
- padding:4px 8px;
- border-radius:12px;
- font-size:12px;
- background:#eee;
+.status{
+padding:8px;
+text-align:center;
+font-size:13px;
+background:#e9f7ef;
+color:#198754;
 }
 
-footer{
- text-align:center;
- padding:20px;
- color:#777;
-}
-
-@media(max-width:600px){
- .grid2{grid-template-columns:1fr}
- .cards{grid-template-columns:1fr 1fr}
- table{font-size:13px}
+.empty{
+text-align:center;
+padding:30px;
+color:#777;
 }
 </style>
 </head>
 
 <body>
 
-<!-- LOGIN -->
-<div id="loginScreen">
+<section id="loginScreen" class="login-screen">
 
- <div class="loginBox">
+<div class="login-box">
 
-  <h2>🔐 Daily Hisab</h2>
-  <p class="small">Jalu Bakery</p>
+<h1>Daily Hisab</h1>
 
-  <label>Email</label>
-  <input id="loginEmail" type="email" placeholder="Owner email">
+<p class="muted" style="text-align:center">
+Login to continue
+</p>
 
-  <label>Password</label>
-  <input id="loginPassword" type="password" placeholder="Password">
+<label>Email</label>
 
-  <button class="primary" style="width:100%" onclick="loginUser()">
-    Login
-  </button>
+<input
+id="loginEmail"
+type="email"
+placeholder="Enter email"
+autocomplete="username"
+>
 
-  <p id="loginMessage"></p>
+<label>Password</label>
 
- </div>
+<input
+id="loginPassword"
+type="password"
+placeholder="Enter password"
+autocomplete="current-password"
+>
+
+<button
+class="primary"
+style="width:100%"
+id="loginButton"
+>
+Login
+</button>
+
+<div
+id="loginMessage"
+class="login-message"
+></div>
+
 </div>
 
+</section>
 
-<!-- APPLICATION -->
-<div id="appScreen" class="hidden">
+<div id="app" class="hidden">
 
 <header>
- <h1>Daily Hisab</h1>
- <small>Jalu Bakery</small>
+
+<h1>Daily Hisab</h1>
+
+<small id="userEmail"></small>
+
+<br>
+
+<button
+id="logoutButton"
+class="secondary"
+>
+Logout
+</button>
+
 </header>
 
+<div id="syncStatus" class="status">
+Connecting to cloud...
+</div>
+
 <nav>
- <button onclick="showPage('dashboard')" id="nav-dashboard">Dashboard</button>
- <button onclick="showPage('entry')" id="nav-entry">Entry</button>
- <button onclick="showPage('parties')" id="nav-parties">Parties</button>
- <button onclick="showPage('employees')" id="nav-employees">Employees</button>
- <button onclick="showPage('production')" id="nav-production">Production</button>
- <button onclick="showPage('reports')" id="nav-reports">Reports</button>
- <button onclick="logoutUser()">Logout</button>
+
+<button
+class="navButton active"
+data-page="dashboardPage"
+>
+Dashboard
+</button>
+
+<button
+class="navButton"
+data-page="transactionPage"
+>
+Transaction
+</button>
+
+<button
+class="navButton"
+data-page="partyPage"
+>
+Parties
+</button>
+
+<button
+class="navButton"
+data-page="productionPage"
+>
+Production
+</button>
+
+<button
+class="navButton"
+data-page="historyPage"
+>
+History
+</button>
+
 </nav>
 
 <main>
 
-<!-- DASHBOARD -->
-<section id="dashboard" class="page">
+<section id="dashboardPage" class="page active">
 
- <h2>Dashboard</h2>
+<h2>Dashboard</h2>
 
- <div class="cards">
+<div class="cards">
 
-  <div class="card">
-   Income
-   <b class="income" id="dashIncome">₹0</b>
-  </div>
+<div class="card">
+Income
+<b class="income" id="totalIncome">
+₹0.00
+</b>
+</div>
 
-  <div class="card">
-   Expense
-   <b class="expense" id="dashExpense">₹0</b>
-  </div>
+<div class="card">
+Expense
+<b class="expense" id="totalExpense">
+₹0.00
+</b>
+</div>
 
-  <div class="card">
-   Receivable
-   <b class="receivable" id="dashReceivable">₹0</b>
-  </div>
+<div class="card">
+Balance
+<b id="totalBalance">
+₹0.00
+</b>
+</div>
 
-  <div class="card">
-   Payable
-   <b class="payable" id="dashPayable">₹0</b>
-  </div>
+<div class="card">
+Receivable
+<b class="receivable" id="totalReceivable">
+₹0.00
+</b>
+</div>
 
- </div>
+<div class="card">
+Payable
+<b class="payable" id="totalPayable">
+₹0.00
+</b>
+</div>
 
- <div class="box">
-  <div class="row">
-   <b>Today's Entries</b>
-   <span id="todayCount" class="badge">0</span>
-  </div>
-  <div id="todayEntries"></div>
- </div>
+<div class="card">
+Production
+<b id="totalProduction">
+0
+</b>
+</div>
+
+</div>
+
+<h2>Recent Transactions</h2>
+
+<div id="recentTransactions"></div>
+
+</section>
+<section id="transactionPage" class="page">
+
+<h2>Add Transaction</h2>
+
+<div class="box">
+
+<label>Date</label>
+
+<input
+type="date"
+id="transactionDate"
+>
+
+<label>Type</label>
+
+<select id="transactionType">
+
+<option value="income">
+Income
+</option>
+
+<option value="expense">
+Expense
+</option>
+
+<option value="receivable">
+Receivable
+</option>
+
+<option value="payable">
+Payable
+</option>
+
+<option value="payment_received">
+Payment Received
+</option>
+
+<option value="payment_made">
+Payment Made
+</option>
+
+</select>
+
+<label>Party / Person</label>
+
+<input
+id="transactionParty"
+placeholder="Customer / Supplier"
+>
+
+<label>Description</label>
+
+<textarea
+id="transactionDescription"
+placeholder="Description"
+></textarea>
+
+<label>Amount</label>
+
+<input
+id="transactionAmount"
+type="number"
+step="0.01"
+min="0"
+placeholder="0.00"
+>
+
+<button
+class="primary"
+id="addTransactionButton"
+>
+Save Transaction
+</button>
+
+<p id="transactionMessage"></p>
+
+</div>
 
 </section>
 
 
-<!-- ENTRY -->
-<section id="entry" class="page">
+<section id="partyPage" class="page">
 
- <h2>➕ Daily Entry</h2>
+<h2>Parties</h2>
 
- <div class="box">
+<div class="box">
 
-  <label>Date</label>
-  <input id="entryDate" type="date">
+<label>Party Name</label>
 
-  <label>Type</label>
-  <select id="entryType" onchange="entryTypeChanged()">
-   <option value="income">Income</option>
-   <option value="expense">Expense</option>
-  </select>
+<input
+id="partyName"
+placeholder="Enter party name"
+>
 
-  <label>Amount</label>
-  <input id="entryAmount" type="number" min="0" step="0.01" placeholder="Amount">
+<label>Opening Balance</label>
 
-  <label>Payment / Account</label>
-  <select id="entryAccount">
-   <option value="cash">Cash</option>
-   <option value="bank">Bank Account</option>
-  </select>
+<input
+id="partyOpening"
+type="number"
+step="0.01"
+placeholder="0.00"
+>
 
-  <label>Party</label>
-  <select id="entryParty">
-   <option value="">-- No Party --</option>
-  </select>
+<label>Opening Type</label>
 
-  <label>Receivable / Payable</label>
-  <select id="entryDue">
-   <option value="none">None</option>
-   <option value="receivable">Receivable</option>
-   <option value="payable">Payable</option>
-  </select>
+<select id="partyOpeningType">
 
-  <label>Description</label>
-  <textarea id="entryDescription" placeholder="Description"></textarea>
+<option value="none">
+None
+</option>
 
-  <button class="primary" onclick="saveEntry()">Save Entry</button>
+<option value="receivable">
+Receivable
+</option>
 
-  <p id="entryMessage"></p>
+<option value="payable">
+Payable
+</option>
 
- </div>
+</select>
 
- <div class="box">
-  <h3>Recent Entries</h3>
-  <div id="entryList"></div>
- </div>
+<button
+class="primary"
+id="addPartyButton"
+>
+Add Party
+</button>
 
-</section>
+</div>
 
-
-<!-- PARTIES -->
-<section id="parties" class="page">
-
- <h2>👤 Party Master</h2>
-
- <div class="box">
-
-  <label>Party Name</label>
-  <input id="partyName" placeholder="Party name">
-
-  <label>Phone</label>
-  <input id="partyPhone" placeholder="Phone number">
-
-  <label>Opening Balance</label>
-  <input id="partyOpening" type="number" placeholder="0">
-
-  <label>Opening Type</label>
-  <select id="partyOpeningType">
-   <option value="none">None</option>
-   <option value="receivable">Receivable</option>
-   <option value="payable">Payable</option>
-  </select>
-
-  <button class="primary" onclick="saveParty()">Add Party</button>
-
- </div>
-
- <div class="box">
-  <h3>Party Ledger</h3>
-
-  <select id="ledgerParty" onchange="showPartyLedger()">
-   <option value="">Select Party</option>
-  </select>
-
-  <div id="partyLedger"></div>
- </div>
-
- <div class="box">
-  <h3>All Parties</h3>
-  <div id="partyList"></div>
- </div>
+<div id="partyList"></div>
 
 </section>
 
 
-<!-- EMPLOYEES -->
-<section id="employees" class="page">
+<section id="productionPage" class="page">
 
- <h2>👨‍💼 Employee Master</h2>
+<h2>Production</h2>
 
- <div class="box">
+<div class="box">
 
-  <label>Employee Name</label>
-  <input id="employeeName" placeholder="Employee name">
+<label>Date</label>
 
-  <label>Phone</label>
-  <input id="employeePhone" placeholder="Phone">
+<input
+type="date"
+id="productionDate"
+>
 
-  <label>Monthly Salary</label>
-  <input id="employeeSalary" type="number" placeholder="Salary">
+<label>Product</label>
 
-  <button class="primary" onclick="saveEmployee()">Add Employee</button>
+<input
+id="productionProduct"
+placeholder="Product name"
+>
 
- </div>
+<label>Quantity</label>
 
- <div class="box">
+<input
+id="productionQuantity"
+type="number"
+step="0.01"
+placeholder="Quantity"
+>
 
-  <h3>Salary / Advance Payment</h3>
+<label>Unit</label>
 
-  <label>Employee</label>
-  <select id="paymentEmployee"></select>
+<input
+id="productionUnit"
+placeholder="kg / pcs / box"
+>
 
-  <label>Date</label>
-  <input id="employeePaymentDate" type="date">
+<button
+class="primary"
+id="addProductionButton"
+>
+Save Production
+</button>
 
-  <label>Payment Type</label>
-  <select id="employeePaymentType">
-   <option value="salary">Salary</option>
-   <option value="advance">Advance</option>
-  </select>
+</div>
 
-  <label>Amount</label>
-  <input id="employeePaymentAmount" type="number">
-
-  <label>Account</label>
-  <select id="employeePaymentAccount">
-   <option value="cash">Cash</option>
-   <option value="bank">Bank</option>
-  </select>
-
-  <button class="primary" onclick="saveEmployeePayment()">Save Payment</button>
-
- </div>
-
- <div class="box">
-  <h3>Employees</h3>
-  <div id="employeeList"></div>
- </div>
+<div id="productionList"></div>
 
 </section>
 
 
-<!-- PRODUCTION -->
-<section id="production" class="page">
+<section id="historyPage" class="page">
 
- <h2>🏭 Daily Production</h2>
+<h2>Transaction History</h2>
 
- <div class="box">
+<div class="box">
 
-  <label>Date</label>
-  <input id="productionDate" type="date">
+<label>Search</label>
 
-  <label>Product</label>
-  <input id="productionProduct" placeholder="Product name">
+<input
+id="historySearch"
+placeholder="Search party or description"
+>
 
-  <label>Quantity</label>
-  <input id="productionQty" type="number" step="0.01">
+</div>
 
-  <label>Unit</label>
-  <select id="productionUnit">
-   <option value="pcs">Pieces</option>
-   <option value="kg">Kg</option>
-   <option value="ltr">Litre</option>
-   <option value="box">Box</option>
-   <option value="other">Other</option>
-  </select>
-
-  <label>Remarks</label>
-  <textarea id="productionRemarks"></textarea>
-
-  <button class="primary" onclick="saveProduction()">Save Production</button>
-
- </div>
-
- <div class="box">
-  <h3>Production Records</h3>
-  <div id="productionList"></div>
- </div>
+<div id="historyList"></div>
 
 </section>
 
-
-<!-- REPORTS -->
-<section id="reports" class="page">
-
- <h2>📊 Reports</h2>
-
- <div class="box">
-
-  <div class="grid2">
-
-   <div>
-    <label>From</label>
-    <input id="reportFrom" type="date">
-   </div>
-
-   <div>
-    <label>To</label>
-    <input id="reportTo" type="date">
-   </div>
-
-  </div>
-
-  <button class="primary" onclick="generateReport()">Generate Report</button>
-
-  <button class="blue" onclick="downloadPDF()">
-   📄 Download PDF
-  </button>
-
-  <button class="secondary" onclick="shareReport()">
-   Share / Copy Report
-  </button>
-
- </div>
-
- <div id="reportResult"></div>
-
- <div class="box">
-  <h3>Backup & Restore</h3>
-
-  <button class="primary" onclick="backupData()">
-   Download Backup
-  </button>
-
-  <label>Restore Backup</label>
-  <input id="restoreFile" type="file" accept=".json">
-
-  <button class="secondary" onclick="restoreData()">
-   Restore
-  </button>
- </div>
-
-</section>
 
 </main>
-
-<footer>
- Daily Hisab • Jalu Bakery
-</footer>
 
 </div>
 
@@ -561,674 +573,847 @@ footer{
 <script type="module">
 
 import { initializeApp }
+
 from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
 
-import {
- getAuth,
- signInWithEmailAndPassword,
- onAuthStateChanged,
- signOut
-}
-from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 
 import {
- getFirestore,
- collection,
- addDoc,
- getDocs,
- query,
- where,
- orderBy,
- serverTimestamp,
- doc,
- deleteDoc
+
+getAuth,
+
+signInWithEmailAndPassword,
+
+onAuthStateChanged,
+
+signOut
+
 }
+
+from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
+
+
+import {
+
+getFirestore,
+
+collection,
+
+addDoc,
+
+deleteDoc,
+
+doc,
+
+onSnapshot,
+
+query,
+
+orderBy,
+
+serverTimestamp
+
+}
+
 from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 
 
 const firebaseConfig = {
- apiKey:"AIzaSyBR7zDhLXHp8-sjIE1ibZ37SQgn2PQLwXk",
- authDomain:"jalu-bakery-daily-hisab.firebaseapp.com",
- projectId:"jalu-bakery-daily-hisab",
- storageBucket:"jalu-bakery-daily-hisab.firebasestorage.app",
- messagingSenderId:"887651742802",
- appId:"1:887651742802:web:f0521ad6fb0adfcf3ddb8b"
+
+apiKey:
+"AIzaSyBR7zDhLXHp8-sjIE1ibZ37SQgn2PQLwXk",
+
+authDomain:
+"jalu-bakery-daily-hisab.firebaseapp.com",
+
+projectId:
+"jalu-bakery-daily-hisab",
+
+storageBucket:
+"jalu-bakery-daily-hisab.firebasestorage.app",
+
+messagingSenderId:
+"887651742802",
+
+appId:
+"1:887651742802:web:f0521ad6fb0adfcf3ddb8b"
+
 };
 
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+const app =
+initializeApp(firebaseConfig);
 
-let data = {
- entries:[],
- parties:[],
- employees:[],
- employeePayments:[],
- production:[]
-};
+const auth =
+getAuth(app);
 
-const BUSINESS_ID = "jalu-bakery";
+const db =
+getFirestore(app);
 
 
-window.dailyHisabFirebase = {
- auth,
- db
-};
+let entries = [];
+
+let parties = [];
+
+let productions = [];
+
+let unsubscribeEntries = null;
+
+let unsubscribeParties = null;
+
+let unsubscribeProductions = null;
 
 
-/* ---------- HELPERS ---------- */
+const loginScreen =
+document.getElementById("loginScreen");
+
+const appScreen =
+document.getElementById("app");
+
+const loginEmail =
+document.getElementById("loginEmail");
+
+const loginPassword =
+document.getElementById("loginPassword");
+
+const loginButton =
+document.getElementById("loginButton");
+
+const loginMessage =
+document.getElementById("loginMessage");
+
+
+async function loginUser(){
+
+const email =
+loginEmail.value.trim();
+
+const password =
+loginPassword.value;
+
+loginMessage.textContent = "";
+
+if(!email || !password){
+
+loginMessage.textContent =
+"Please enter email and password.";
+
+return;
+
+}
+
+loginButton.disabled = true;
+
+loginButton.textContent =
+"Logging in...";
+
+try{
+
+await signInWithEmailAndPassword(
+auth,
+email,
+password
+);
+
+}catch(error){
+
+console.error(error);
+
+loginMessage.textContent =
+"Login failed. Check your email and password.";
+
+loginButton.disabled = false;
+
+loginButton.textContent =
+"Login";
+
+}
+
+}
+
+
+loginButton.addEventListener(
+"click",
+loginUser
+);
+
+
+loginPassword.addEventListener(
+"keydown",
+function(event){
+
+if(event.key === "Enter"){
+
+loginUser();
+
+}
+
+}
+);
+
+
+document
+.getElementById("logoutButton")
+.addEventListener(
+"click",
+async function(){
+
+await signOut(auth);
+
+}
+);
+
+
+onAuthStateChanged(
+auth,
+function(user){
+
+if(user){
+
+loginScreen.classList.add(
+"hidden"
+);
+
+appScreen.classList.remove(
+"hidden"
+);
+
+document.getElementById(
+"userEmail"
+).textContent =
+user.email || "";
+
+startCloudSync();
+
+}else{
+
+loginScreen.classList.remove(
+"hidden"
+);
+
+appScreen.classList.add(
+"hidden"
+);
+
+stopCloudSync();
+
+}
+
+}
+);
+
+
+document
+.querySelectorAll(".navButton")
+.forEach(function(button){
+
+button.addEventListener(
+"click",
+function(){
+
+document
+.querySelectorAll(".navButton")
+.forEach(function(b){
+
+b.classList.remove("active");
+
+});
+
+
+button.classList.add("active");
+
+
+document
+.querySelectorAll(".page")
+.forEach(function(page){
+
+page.classList.remove("active");
+
+});
+
+
+document
+.getElementById(
+button.dataset.page
+)
+.classList.add("active");
+
+}
+
+);
+
+});
+
 
 function today(){
 
- const d = new Date();
+const d = new Date();
 
- return d.toISOString().split("T")[0];
-
-}
-
-
-function money(n){
-
- return "₹" + Number(n || 0).toLocaleString("en-IN",{
-  maximumFractionDigits:2
- });
+return d.getFullYear()
++ "-"
++ String(d.getMonth()+1)
+.padStart(2,"0")
++ "-"
++ String(d.getDate())
+.padStart(2,"0");
 
 }
 
 
-function uid(){
-
- return Date.now().toString(36)+Math.random().toString(36).slice(2);
-}
-
-
-function currentUser(){
-
- return auth.currentUser;
-}
+document.getElementById(
+"transactionDate"
+).value = today();
 
 
-/* ---------- LOGIN ---------- */
+document.getElementById(
+"productionDate"
+).value = today();
 
-window.loginUser = async function(){
 
- const email =
- document.getElementById("loginEmail").value.trim();
+function startCloudSync(){
 
- const password =
- document.getElementById("loginPassword").value;
+stopCloudSync();
 
- const message =
- document.getElementById("loginMessage");
+const entriesQuery =
+query(
+collection(db,"entries"),
+orderBy("createdAt","desc")
+);
 
- if(!email || !password){
+unsubscribeEntries =
+onSnapshot(
+entriesQuery,
+function(snapshot){
 
-  message.textContent="Please enter email and password.";
+entries =
+snapshot.docs.map(function(item){
 
-  return;
-
- }
-
- try{
-
-  message.textContent="Logging in...";
-
-  await signInWithEmailAndPassword(
-   auth,
-   email,
-   password
-  );
-
-  message.textContent="";
-
- }catch(error){
-
-  console.error(error);
-
-  message.textContent=
-   "Login failed. Please check email and password.";
-
- }
-
+return {
+id:item.id,
+...item.data()
 };
 
+});
 
-window.logoutUser = async function(){
+renderAll();
 
- await signOut(auth);
+document.getElementById(
+"syncStatus"
+).textContent =
+"☁️ Data synchronized";
 
+},
+function(error){
+
+console.error(error);
+
+document.getElementById(
+"syncStatus"
+).textContent =
+"Cloud sync error";
+
+}
+);
+
+
+const partiesQuery =
+query(
+collection(db,"parties"),
+orderBy("createdAt","desc")
+);
+
+unsubscribeParties =
+onSnapshot(
+partiesQuery,
+function(snapshot){
+
+parties =
+snapshot.docs.map(function(item){
+
+return {
+id:item.id,
+...item.data()
 };
 
+});
 
-/* ---------- DATABASE ---------- */
-
-async function loadCollection(name){
-
- if(!currentUser()) return [];
-
- const q = query(
-  collection(db,name),
-  where("businessId","==",BUSINESS_ID)
- );
-
- const snap = await getDocs(q);
-
- return snap.docs.map(d=>({
-  id:d.id,
-  ...d.data()
- }));
+renderAll();
 
 }
+);
 
 
-async function loadAll(){
+const productionQuery =
+query(
+collection(db,"production"),
+orderBy("createdAt","desc")
+);
 
- try{
+unsubscribeProductions =
+onSnapshot(
+productionQuery,
+function(snapshot){
 
-  data.entries = await loadCollection("entries");
-  data.parties = await loadCollection("parties");
-  data.employees = await loadCollection("employees");
-  data.employeePayments =
-   await loadCollection("employeePayments");
-  data.production =
-   await loadCollection("production");
+productions =
+snapshot.docs.map(function(item){
 
-  refreshAll();
+return {
+id:item.id,
+...item.data()
+};
 
- }catch(error){
+});
 
-  console.error(error);
-
-  alert(
-   "Unable to load cloud data. Please check Firestore rules."
-  );
-
- }
+renderAll();
 
 }
-
-
-async function cloudAdd(name,obj){
-
- if(!currentUser()){
-
-  alert("Please login first.");
-
-  return null;
-
- }
-
- const clean = {
-  ...obj,
-  businessId:BUSINESS_ID,
-  createdBy:currentUser().uid,
-  createdAt:serverTimestamp()
- };
-
- const ref = await addDoc(
-  collection(db,name),
-  clean
- );
-
- return {
-  id:ref.id,
-  ...obj
- };
+);
 
 }
 
 
-/* ---------- NAVIGATION ---------- */
+function stopCloudSync(){
 
-window.showPage = function(page){
+if(unsubscribeEntries){
 
- document.querySelectorAll(".page")
-  .forEach(p=>p.classList.remove("active"));
+unsubscribeEntries();
 
- document.querySelectorAll("nav button")
-  .forEach(b=>b.classList.remove("active"));
+unsubscribeEntries = null;
 
- const target =
- document.getElementById(page);
+}
 
- if(target) target.classList.add("active");
+if(unsubscribeParties){
 
- const nav =
- document.getElementById("nav-"+page);
+unsubscribeParties();
 
- if(nav) nav.classList.add("active");
+unsubscribeParties = null;
 
- refreshAll();
+}
+
+if(unsubscribeProductions){
+
+unsubscribeProductions();
+
+unsubscribeProductions = null;
+
+}
+
+entries = [];
+
+parties = [];
+
+productions = [];
+
+}
+ /* ================= ADD TRANSACTION ================= */
+
+document
+.getElementById("addTransactionButton")
+.addEventListener(
+"click",
+async function(){
+
+const date =
+document.getElementById(
+"transactionDate"
+).value;
+
+const type =
+document.getElementById(
+"transactionType"
+).value;
+
+const party =
+document.getElementById(
+"transactionParty"
+).value.trim();
+
+const description =
+document.getElementById(
+"transactionDescription"
+).value.trim();
+
+const amount =
+Number(
+document.getElementById(
+"transactionAmount"
+).value
+);
+
+if(!date){
+
+alert("Please select date.");
+
+return;
+
+}
+
+if(!amount || amount <= 0){
+
+alert("Please enter amount.");
+
+return;
+
+}
+
+if(!auth.currentUser){
+
+alert("Please login first.");
+
+return;
+
+}
+
+try{
+
+await addDoc(
+collection(db,"entries"),
+{
+
+date:date,
+
+type:type,
+
+party:party,
+
+description:description,
+
+amount:amount,
+
+userId:auth.currentUser.uid,
+
+userEmail:auth.currentUser.email,
+
+createdAt:serverTimestamp()
+
+}
+);
+
+document.getElementById(
+"transactionParty"
+).value="";
+
+document.getElementById(
+"transactionDescription"
+).value="";
+
+document.getElementById(
+"transactionAmount"
+).value="";
+
+alert("Transaction saved.");
+
+}catch(error){
+
+console.error(error);
+
+alert(
+"Could not save transaction."
+);
+
+}
+
+});
+
+
+/* ================= ADD PARTY ================= */
+
+document
+.getElementById("addPartyButton")
+.addEventListener(
+"click",
+async function(){
+
+const name =
+document.getElementById(
+"partyName"
+).value.trim();
+
+const opening =
+Number(
+document.getElementById(
+"partyOpening"
+).value
+) || 0;
+
+const openingType =
+document.getElementById(
+"partyOpeningType"
+).value;
+
+if(!name){
+
+alert("Please enter party name.");
+
+return;
+
+}
+
+if(!auth.currentUser){
+
+alert("Please login first.");
+
+return;
+
+}
+
+try{
+
+await addDoc(
+collection(db,"parties"),
+{
+
+name:name,
+
+opening:opening,
+
+openingType:openingType,
+
+userId:auth.currentUser.uid,
+
+userEmail:auth.currentUser.email,
+
+createdAt:serverTimestamp()
+
+}
+);
+
+document.getElementById(
+"partyName"
+).value="";
+
+document.getElementById(
+"partyOpening"
+).value="";
+
+alert("Party saved.");
+
+}catch(error){
+
+console.error(error);
+
+alert(
+"Could not save party."
+);
+
+}
+
+});
+
+
+/* ================= ADD PRODUCTION ================= */
+
+document
+.getElementById("addProductionButton")
+.addEventListener(
+"click",
+async function(){
+
+const date =
+document.getElementById(
+"productionDate"
+).value;
+
+const product =
+document.getElementById(
+"productionProduct"
+).value.trim();
+
+const quantity =
+Number(
+document.getElementById(
+"productionQuantity"
+).value
+);
+
+const unit =
+document.getElementById(
+"productionUnit"
+).value.trim();
+
+if(!date){
+
+alert("Please select date.");
+
+return;
+
+}
+
+if(!product){
+
+alert("Please enter product.");
+
+return;
+
+}
+
+if(!quantity || quantity <= 0){
+
+alert("Please enter quantity.");
+
+return;
+
+}
+
+if(!auth.currentUser){
+
+alert("Please login first.");
+
+return;
+
+}
+
+try{
+
+await addDoc(
+collection(db,"production"),
+{
+
+date:date,
+
+product:product,
+
+quantity:quantity,
+
+unit:unit,
+
+userId:auth.currentUser.uid,
+
+userEmail:auth.currentUser.email,
+
+createdAt:serverTimestamp()
+
+}
+);
+
+document.getElementById(
+"productionProduct"
+).value="";
+
+document.getElementById(
+"productionQuantity"
+).value="";
+
+document.getElementById(
+"productionUnit"
+).value="";
+
+alert("Production saved.");
+
+}catch(error){
+
+console.error(error);
+
+alert(
+"Could not save production."
+);
+
+}
+
+});
+
+
+/* ================= DELETE TRANSACTION ================= */
+
+window.deleteTransaction =
+async function(id){
+
+if(!confirm(
+"Delete this transaction?"
+)){
+
+return;
+
+}
+
+try{
+
+await deleteDoc(
+doc(db,"entries",id)
+);
+
+}catch(error){
+
+console.error(error);
+
+alert("Delete failed.");
+
+}
 
 };
 
 
-/* ---------- ENTRIES ---------- */
+/* ================= DELETE PARTY ================= */
 
-window.entryTypeChanged=function(){
+window.deleteParty =
+async function(id){
 
-};
+if(!confirm(
+"Delete this party?"
+)){
 
+return;
 
-window.saveEntry=async function(){
+}
 
- const date =
- document.getElementById("entryDate").value;
+try{
 
- const type =
- document.getElementById("entryType").value;
+await deleteDoc(
+doc(db,"parties",id)
+);
 
- const amount =
- Number(document.getElementById("entryAmount").value);
+}catch(error){
 
- const account =
- document.getElementById("entryAccount").value;
+console.error(error);
 
- const party =
- document.getElementById("entryParty").value;
+alert("Delete failed.");
 
- const due =
- document.getElementById("entryDue").value;
-
- const description =
- document.getElementById("entryDescription").value.trim();
-
- const message =
- document.getElementById("entryMessage");
-
-
- if(!date || !amount || amount<=0){
-
-  message.textContent="Enter date and valid amount.";
-
-  return;
-
- }
-
-
- try{
-
-  const obj={
-   date,
-   type,
-   amount,
-   account,
-   partyId:party,
-   due,
-   description
-  };
-
-  const saved =
-   await cloudAdd("entries",obj);
-
-  if(saved){
-
-   data.entries.push(saved);
-
-   message.textContent="Entry saved successfully.";
-
-   document.getElementById("entryAmount").value="";
-   document.getElementById("entryDescription").value="";
-
-   refreshAll();
-
-  }
-
- }catch(error){
-
-  console.error(error);
-
-  message.textContent=
-   "Unable to save entry.";
-
- }
+}
 
 };
 
 
-/* ---------- PARTIES ---------- */
+/* ================= DELETE PRODUCTION ================= */
 
-window.saveParty=async function(){
+window.deleteProduction =
+async function(id){
 
- const name =
- document.getElementById("partyName").value.trim();
+if(!confirm(
+"Delete this production?"
+)){
 
- const phone =
- document.getElementById("partyPhone").value.trim();
+return;
 
- const opening =
- Number(document.getElementById("partyOpening").value)||0;
+}
 
- const openingType =
- document.getElementById("partyOpeningType").value;
+try{
 
+await deleteDoc(
+doc(db,"production",id)
+);
 
- if(!name){
+}catch(error){
 
-  alert("Enter party name.");
+console.error(error);
 
-  return;
+alert("Delete failed.");
 
- }
-
-
- try{
-
-  const obj={
-   name,
-   phone,
-   opening,
-   openingType
-  };
-
-  const saved =
-   await cloudAdd("parties",obj);
-
-  if(saved){
-
-   data.parties.push(saved);
-
-   document.getElementById("partyName").value="";
-   document.getElementById("partyPhone").value="";
-   document.getElementById("partyOpening").value="";
-
-   refreshAll();
-
-  }
-
- }catch(error){
-
-  console.error(error);
-
-  alert("Unable to save party.");
-
- }
+}
 
 };
 
 
-window.showPartyLedger=function(){
+/* ================= MONEY ================= */
 
- const id =
- document.getElementById("ledgerParty").value;
+function money(value){
 
- const box =
- document.getElementById("partyLedger");
-
- if(!id){
-
-  box.innerHTML="";
-
-  return;
-
- }
-
- const party =
- data.parties.find(p=>p.id===id);
-
- if(!party){
-
-  box.innerHTML="";
-
-  return;
+return "₹" +
+Number(value || 0)
+.toLocaleString(
+"en-IN",
+{
+minimumFractionDigits:2,
+maximumFractionDigits:2
+}
+);
 
  }
-
- const rows =
- data.entries.filter(e=>e.partyId===id);
-
- let balance=Number(party.opening||0);
-
- if(party.openingType==="payable")
-  balance=-balance;
-
- let html=
- "<div class='entry'><b>"+
- party.name+
- "</b><br>Opening: "+
- money(balance)+
- "</div>";
-
- rows.sort((a,b)=>
-  String(a.date).localeCompare(String(b.date))
- );
-
- rows.forEach(e=>{
-
-  const effect =
-   e.type==="income" ? e.amount : -e.amount;
-
-  balance += effect;
-
-  html +=
-   "<div class='entry'>"+
-   "<b>"+e.date+"</b> • "+
-   e.type.toUpperCase()+
-   "<br>"+
-   (e.description||"")+
-   "<br><b>"+money(e.amount)+
-   "</b> • Balance "+
-   money(balance)+
-   "</div>";
-
- });
-
- box.innerHTML=html;
-
-};
-
-
-/* ---------- EMPLOYEES ---------- */
-
-window.saveEmployee=async function(){
-
- const name =
- document.getElementById("employeeName").value.trim();
-
- const phone =
- document.getElementById("employeePhone").value.trim();
-
- const salary =
- Number(document.getElementById("employeeSalary").value)||0;
-
-
- if(!name){
-
-  alert("Enter employee name.");
-
-  return;
-
- }
-
-
- try{
-
-  const saved =
-   await cloudAdd(
-    "employees",
-    {name,phone,salary}
-   );
-
-  if(saved){
-
-   data.employees.push(saved);
-
-   document.getElementById("employeeName").value="";
-   document.getElementById("employeePhone").value="";
-   document.getElementById("employeeSalary").value="";
-
-   refreshAll();
-
-  }
-
- }catch(error){
-
-  console.error(error);
-
-  alert("Unable to save employee.");
-
- }
-
-};
-
-
-window.saveEmployeePayment=async function(){
-
- const employeeId =
- document.getElementById("paymentEmployee").value;
-
- const date =
- document.getElementById("employeePaymentDate").value;
-
- const type =
- document.getElementById("employeePaymentType").value;
-
- const amount =
- Number(document.getElementById("employeePaymentAmount").value);
-
- const account =
- document.getElementById("employeePaymentAccount").value;
-
-
- if(!employeeId || !date || !amount){
-
-  alert("Please fill all payment details.");
-
-  return;
-
- }
-
-
- try{
-
-  const obj={
-   employeeId,
-   date,
-   type,
-   amount,
-   account
-  };
-
-  const saved =
-   await cloudAdd("employeePayments",obj);
-
-  if(saved){
-
-   data.employeePayments.push(saved);
-
-   document.getElementById("employeePaymentAmount").value="";
-
-   refreshAll();
-
-   alert("Payment saved.");
-
-  }
-
- }catch(error){
-
-  console.error(error);
-
-  alert("Unable to save payment.");
-
- }
-
-};
-
-
-/* ---------- PRODUCTION ---------- */
-
-window.saveProduction=async function(){
-
- const date =
- document.getElementById("productionDate").value;
-
- const product =
- document.getElementById("productionProduct").value.trim();
-
- const qty =
- Number(document.getElementById("productionQty").value);
-
- const unit =
- document.getElementById("productionUnit").value;
-
- const remarks =
- document.getElementById("productionRemarks").value.trim();
-
-
- if(!date || !product || !qty){
-
-  alert("Enter production details.");
-
-  return;
-
- }
-
-
- try{
-
-  const saved =
-   await cloudAdd(
-    "production",
-    {
-     date,
-     product,
-     qty,
-     unit,
-     remarks
-    }
-   );
-
-  if(saved){
-
-   data.production.push(saved);
-
-   document.getElementById("productionProduct").value="";
-   document.getElementById("productionQty").value="";
-   document.getElementById("productionRemarks").value="";
-
-   refreshAll();
-
-  }
-
- }catch(error){
-
-  console.error(error);
-
-  alert("Unable to save production.");
-
- }
-
-};
-
-
-/* ---------- DASHBOARD ---------- */
-
-function dashboard(){
-
- const income =
- data.entries
- .filter(e=>e.type==="income")
- .reduce((s,e)=>s+Number(e.amount||0),0);
-
- const expense =
- data.entries
- .filter(e=>e.type==="expense")
- .reduce((s,e)=>s+Number(e.amount||0),0);
-
- let receivable=0;
- let payable=0;
-
- data.parties.forEach(p=>{
-
-  let bal =
-   Number(p.opening||0);
-
-  if(p.openingType==="receivable")
-   receivable+=bal;
-
-  if(p.openingType==="payable")
-   payable+=bal;
-
-  data.entries
-   .filter(
