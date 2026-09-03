@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "887651742802",
+    "project_id": "jalu-bakery-daily-hisab",
+    "storage_bucket": "jalu-bakery-daily-hisab.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:887651742802:android:dd4db66a679c15873ddb8b",
+        "android_client_info": {
+          "package_name": "com.example.daily_hisab"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBV9Fhi_VSa-t0zXjBFKUXQVma-tNJjiW8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

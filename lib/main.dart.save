@@ -1,0 +1,215 @@
+import 'package:flutter/material.dart';
+
+void main() {
+  runApp(const DailyHisabApp());
+}
+
+class DailyHisabApp extends StatelessWidget {
+  const DailyHisabApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'Daily Hisab',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+        useMaterial3: true,
+      ),
+      home: const DailyHisabHome(),
+    );
+  }
+}
+
+class DailyHisabHome extends StatefulWidget {
+  const DailyHisabHome({super.key});
+
+  @override
+  State<DailyHisabHome> createState() => _DailyHisabHomeState();
+}
+
+class _DailyHisabHomeState extends State<DailyHisabHome> {
+  int currentIndex = 0;
+
+  final List<String> titles = [
+    'Dashboard',
+    'Transactions',
+    'Parties',
+    'Production',
+    'Reports',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(titles[currentIndex]),
+      ),
+      body: IndexedStack(
+        index: currentIndex,
+        children: const [
+          DashboardPage(),
+          TransactionsPage(),
+          PartiesPage(),
+          ProductionPage(),
+          ReportsPage(),
+        ],
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: currentIndex,
+        onDestinationSelected: (index) {
+          setState(() {
+            currentIndex = index;
+          });
+        },
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.dashboard),
+            label: 'Dashboard',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.receipt_long),
+            label: 'Transactions',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.people),
+            label: 'Parties',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.factory),
+            label: 'Production',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.assessment),
+            label: 'Reports',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class DashboardPage extends StatelessWidget {
+  const DashboardPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: const [
+        SummaryCard(
+          title: 'Income',
+          value: '₹0.00',
+          icon: Icons.arrow_downward,
+        ),
+        SummaryCard(
+          title: 'Expense',
+          value: '₹0.00',
+          icon: Icons.arrow_upward,
+        ),
+        SummaryCard(
+          title: 'Cash Balance',
+          value: '₹0.00',
+          icon: Icons.account_balance_wallet,
+        ),
+        SummaryCard(
+          title: 'Bank Balance',
+          value: '₹0.00',
+          icon: Icons.account_balance,
+        ),
+      ],
+    );
+  }
+}
+
+class SummaryCard extends StatelessWidget {
+  final String title;
+  final String value;
+  final IconData icon;
+
+  const SummaryCard({
+    super.key,
+    required this.title,
+    required this.value,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        leading: Icon(icon, size: 32),
+        title: Text(title),
+        subtitle: Text(
+          value,
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class TransactionsPage extends StatelessWidget {
+  const TransactionsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Text(
+        'Transactions\n\nAdd income and expense entries here.',
+        textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 18),
+      ),
+    );
+  }
+}
+
+class PartiesPage extends StatelessWidget {
+  const PartiesPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Text(
+        'Parties\n\nCustomers and suppliers will appear here.',
+        textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 18),
+      ),
+    );
+  }
+}
+
+class ProductionPage extends StatelessWidget {
+  const ProductionPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Text(
+        'Production\n\nProduction records will appear here.',
+        textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 18),
+      ),
+    );
+  }
+}
+
+class ReportsPage extends StatelessWidget {
+  const ReportsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Text(
+        'Reports\n\nDaily and monthly reports will appear here.',
+        textAlign: TextAlign.center,
+         style: TextStyle(fontSize: 18),
+      ),</> dart
+    );
+ }
+}
+k

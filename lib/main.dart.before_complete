@@ -1,0 +1,172 @@
+import 'package:flutter/material.dart';
+
+void main() {
+  runApp(const DailyHisabApp());
+}
+
+class DailyHisabApp extends StatelessWidget {
+  const DailyHisabApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'Daily Hisab',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+        useMaterial3: true,
+      ),
+      home: const DailyHisabHome(),
+    );
+  }
+}
+
+class HisabEntry {
+  final String id;
+  final DateTime date;
+  final String type;
+  final String description;
+  final double amount;
+
+  HisabEntry({required this.id, required this.date, required this.type, required this.description, required this.amount});
+}
+
+class DailyHisabHome extends StatefulWidget {
+  const DailyHisabHome({super.key});
+  @override State<DailyHisabHome> createState() => _DailyHisabHomeState();
+}
+
+class _DailyHisabHomeState extends State<DailyHisabHome> {
+  int currentIndex = 0;
+  final List<HisabEntry> _entries = [];
+
+  double get totalIncome => _entries.where((e) => e.type == 'Income').fold(0.0, (s,e) => s + e.amount);
+  double get totalExpense => _entries.where((e) => e.type == 'Expense').fold(0.0, (s,e) => s + e.amount);
+  double get balance => totalIncome - totalExpense;
+
+  Future<void> _addEntry() async {
+    final result = await showDialog<HisabEntry>(context: context, builder: (_) => const _AddEntryDialog());
+    if (result != null) setState(() => _entries.insert(0, result));
+  }
+  void _deleteEntry(HisabEntry e) => setState(() => _entries.removeWhere((x) => x.id == e.id));
+
+  @override Widget build(BuildContext context) {
+    final pages = [
+      DashboardPage(income: totalIncome, expense: totalExpense, balance: balance, entries: _entries, onAddEntry: _addEntry),
+      TransactionsPage(entries: _entries, onAddEntry: _addEntry, onDeleteEntry: _deleteEntry),
+      const PartiesPage(), const ProductionPage(), const ReportsPage(),
+    ];
+    return Scaffold(
+      body: IndexedStack(index: currentIndex, children: pages),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: currentIndex, onDestinationSelected: (i) => setState(() => currentIndex = i),
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard), label: 'Dashboard'),
+          NavigationDestination(icon: Icon(Icons.receipt_long_outlined), selectedIcon: Icon(Icons.receipt_long), label: 'Transactions'),
+          NavigationDestination(icon: Icon(Icons.people_outline), selectedIcon: Icon(Icons.people), label: 'Parties'),
+          NavigationDestination(icon: Icon(Icons.factory_outlined), selectedIcon: Icon(Icons.factory), label: 'Production'),
+          NavigationDestination(icon: Icon(Icons.bar_chart_outlined), selectedIcon: Icon(Icons.bar_chart), label: 'Reports'),
+        ],
+      ),
+    );
+  }
+}
+
+class DashboardPage extends StatelessWidget {
+  final double income, expense, balance;
+  final List<HisabEntry> entries;
+  final VoidCallback onAddEntry;
+  const DashboardPage({super.key, required this.income, required this.expense, required this.balance, required this.entries, required this.onAddEntry});
+  String money(double v) => '₹${v.toStringAsFixed(2)}';
+  @override Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Daily Hisab')),
+    floatingActionButton: FloatingActionButton.extended(onPressed: onAddEntry, icon: const Icon(Icons.add), label: const Text('Add Entry')),
+    body: ListView(padding: const EdgeInsets.all(16), children: [
+      const Text('Dashboard', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)), const SizedBox(height: 16),
+      Row(children: [Expanded(child: _SummaryCard(title: 'Income', value: money(income), icon: Icons.arrow_downward)), const SizedBox(width: 12), Expanded(child: _SummaryCard(title: 'Expense', value: money(expense), icon: Icons.arrow_upward))]),
+      const SizedBox(height: 12), _SummaryCard(title: 'Balance', value: money(balance), icon: Icons.account_balance_wallet),
+      const SizedBox(height: 24), Text('Recent Entries', style: Theme.of(context).textTheme.titleLarge), const SizedBox(height: 8),
+      if (entries.isEmpty) const Card(child: Padding(padding: EdgeInsets.all(20), child: Center(child: Text('No entries yet.\nTap “Add Entry” to start.'))))
+      else ...entries.take(5).map((e) => ListTile(leading: CircleAvatar(child: Icon(e.type == 'Income' ? Icons.arrow_downward : Icons.arrow_upward)), title: Text(e.description), subtitle: Text('${e.type} • ${e.date.day}/${e.date.month}/${e.date.year}'), trailing: Text(money(e.amount), style: const TextStyle(fontWeight: FontWeight.bold))))
+    ]));
+}
+
+class _SummaryCard extends StatelessWidget {
+  final String title, value; final IconData icon;
+  const _SummaryCard({required this.title, required this.value, required this.icon});
+  @override Widget build(BuildContext context) => Card(child: Padding(padding: const EdgeInsets.all(16), child: Row(children: [Icon(icon, size: 30), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title), const SizedBox(height: 4), Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold))]))])));
+}
+
+class TransactionsPage extends StatelessWidget {
+  final List<HisabEntry> entries; final VoidCallback onAddEntry; final void Function(HisabEntry) onDeleteEntry;
+  const TransactionsPage({super.key, required this.entries, required this.onAddEntry, required this.onDeleteEntry});
+  String money(double v) => '₹${v.toStringAsFixed(2)}';
+  @override Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Transactions')),
+    floatingActionButton: FloatingActionButton.extended(onPressed: onAddEntry, icon: const Icon(Icons.add), label: const Text('Add Entry')),
+    body: entries.isEmpty ? const Center(child: Text('No transactions yet.\nTap “Add Entry” to enter your first transaction.', textAlign: TextAlign.center, style: TextStyle(fontSize: 16)))
+    : ListView.builder(padding: const EdgeInsets.only(bottom: 90), itemCount: entries.length, itemBuilder: (_,i) { final e=entries[i]; return Card(margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), child: ListTile(leading: CircleAvatar(child: Icon(e.type=='Income'?Icons.arrow_downward:Icons.arrow_upward)), title: Text(e.description, style: const TextStyle(fontWeight: FontWeight.w600)), subtitle: Text('${e.type} • ${e.date.day}/${e.date.month}/${e.date.year}'), trailing: Row(mainAxisSize: MainAxisSize.min, children: [Text(money(e.amount), style: const TextStyle(fontWeight: FontWeight.bold)), IconButton(icon: const Icon(Icons.delete_outline), onPressed: () => onDeleteEntry(e))]))); }));
+}
+
+class _AddEntryDialog extends StatefulWidget {
+  const _AddEntryDialog();
+  @override State<_AddEntryDialog> createState() => _AddEntryDialogState();
+}
+class _AddEntryDialogState extends State<_AddEntryDialog> {
+  final formKey = GlobalKey<FormState>(); final description = TextEditingController(); final amount = TextEditingController();
+  String type='Income'; DateTime date=DateTime.now();
+  @override void dispose(){description.dispose(); amount.dispose(); super.dispose();}
+  Future<void> pickDate() async { final d=await showDatePicker(context: context, initialDate: date, firstDate: DateTime(2000), lastDate: DateTime(2100)); if(d!=null)setState(()=>date=d); }
+  void save(){ if(!formKey.currentState!.validate())return; final a=double.tryParse(amount.text.trim()); if(a==null||a<=0)return; Navigator.pop(context, HisabEntry(id: DateTime.now().microsecondsSinceEpoch.toString(), date: date, type: type, description: description.text.trim(), amount: a)); }
+  @override Widget build(BuildContext context)=>AlertDialog(title: const Text('Add Entry'), content: Form(key: formKey, child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children:[
+    DropdownButtonFormField<String>(value:type, decoration: const InputDecoration(labelText:'Type', border:OutlineInputBorder()), items: const [DropdownMenuItem(value:'Income',child:Text('Income')),DropdownMenuItem(value:'Expense',child:Text('Expense'))], onChanged:(v){if(v!=null)setState(()=>type=v);}),
+    const SizedBox(height:12), TextFormField(controller:description, decoration: const InputDecoration(labelText:'Description', hintText:'e.g. Sale, rent, electricity', border:OutlineInputBorder()), validator:(v)=>v==null||v.trim().isEmpty?'Enter a description':null),
+    const SizedBox(height:12), TextFormField(controller:amount, keyboardType: const TextInputType.numberWithOptions(decimal:true), decoration: const InputDecoration(labelText:'Amount', prefixText:'₹ ', border:OutlineInputBorder()), validator:(v){final a=double.tryParse(v?.trim()??''); return a==null||a<=0?'Enter a valid amount':null;}),
+    const SizedBox(height:12), ListTile(contentPadding:EdgeInsets.zero, leading:const Icon(Icons.calendar_today), title:const Text('Date'), subtitle:Text('${date.day}/${date.month}/${date.year}'), onTap:pickDate),
+  ]))), actions:[TextButton(onPressed:()=>Navigator.pop(context),child:const Text('Cancel')), FilledButton(onPressed:save,child:const Text('Save'))]);
+}
+
+class PartiesPage extends StatelessWidget {
+  const PartiesPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Text(
+        'Parties\n\nCustomers and suppliers will appear here.',
+        textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 18),
+      ),
+    );
+  }
+}
+
+class ProductionPage extends StatelessWidget {
+  const ProductionPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Text(
+        'Production\n\nProduction records will appear here.',
+        textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 18),
+      ),
+    );
+  }
+}
+
+class ReportsPage extends StatelessWidget {
+  const ReportsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Text(
+        'Reports\n\nDaily and monthly reports will appear here.',
+        textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 18),
+      ),
+    );
+  }
+}

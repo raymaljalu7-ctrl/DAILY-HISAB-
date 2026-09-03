@@ -1,0 +1,31 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "jalu-bakery-daily-hisab",
+          "appId": "1:887651742802:android:dd4db66a679c15873ddb8b",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "jalu-bakery-daily-hisab",
+          "configurations": {
+            "android": "1:887651742802:android:dd4db66a679c15873ddb8b",
+            "ios": "1:887651742802:ios:cecb4529aab50a1f3ddb8b",
+            "macos": "1:887651742802:ios:cecb4529aab50a1f3ddb8b",
+            "web": "1:887651742802:web:f0521ad6fb0adfcf3ddb8b",
+            "windows": "1:887651742802:web:f7cc7fba11e361e13ddb8b"
+          }
+        }
+      }
+    }
+  },
+  "firestore": {
+    "database": "(default)",
+    "location": "asia-south1",
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  }
+}
