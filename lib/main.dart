@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-
 import 'firebase_options.dart';
 
 void main() async {
@@ -41,8 +40,7 @@ String money(dynamic value) {
   return '${negative ? '-' : ''}₹$whole.${parts[1]}';
 }
 
-double numValue(dynamic value) =>
-    value is num ? value.toDouble() : double.tryParse('$value') ?? 0;
+double numValue(dynamic value) => value is num ? value.toDouble() : double.tryParse('$value') ?? 0;
 
 DateTime asDate(dynamic value) {
   if (value is Timestamp) return value.toDate();
@@ -56,41 +54,25 @@ String dateText(dynamic value) {
   return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 }
 
-String isoDate(DateTime d) =>
-    '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+String isoDate(DateTime d) => '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
 DateTimeRange periodRange(String period) {
   final n = DateTime.now();
   if (period == 'Daily') {
-    return DateTimeRange(
-      start: DateTime(n.year, n.month, n.day),
-      end: DateTime(n.year, n.month, n.day, 23, 59, 59),
-    );
+    return DateTimeRange(start: DateTime(n.year, n.month, n.day), end: DateTime(n.year, n.month, n.day, 23, 59, 59));
   }
   if (period == 'Quarterly') {
     final m = ((n.month - 1) ~/ 3) * 3 + 1;
-    return DateTimeRange(
-      start: DateTime(n.year, m),
-      end: DateTime(n.year, m + 3, 0, 23, 59, 59),
-    );
+    return DateTimeRange(start: DateTime(n.year, m), end: DateTime(n.year, m + 3, 0, 23, 59, 59));
   }
   if (period == '6 Monthly') {
     final m = n.month <= 6 ? 1 : 7;
-    return DateTimeRange(
-      start: DateTime(n.year, m),
-      end: DateTime(n.year, m + 6, 0, 23, 59, 59),
-    );
+    return DateTimeRange(start: DateTime(n.year, m), end: DateTime(n.year, m + 6, 0, 23, 59, 59));
   }
   if (period == 'Yearly') {
-    return DateTimeRange(
-      start: DateTime(n.year),
-      end: DateTime(n.year + 1, 1, 0, 23, 59, 59),
-    );
+    return DateTimeRange(start: DateTime(n.year), end: DateTime(n.year + 1, 1, 0, 23, 59, 59));
   }
-  return DateTimeRange(
-    start: DateTime(n.year, n.month),
-    end: DateTime(n.year, n.month + 1, 0, 23, 59, 59),
-  );
+  return DateTimeRange(start: DateTime(n.year, n.month), end: DateTime(n.year, n.month + 1, 0, 23, 59, 59));
 }
 
 class DailyHisabApp extends StatelessWidget {
@@ -104,11 +86,7 @@ class DailyHisabApp extends StatelessWidget {
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(seedColor: purple),
         scaffoldBackgroundColor: const Color(0xFFF7F5FC),
-        inputDecorationTheme: const InputDecorationTheme(
-          border: OutlineInputBorder(),
-          filled: true,
-          fillColor: Colors.white,
-        ),
+        inputDecorationTheme: const InputDecorationTheme(border: OutlineInputBorder(), filled: true, fillColor: Colors.white),
         cardTheme: const CardThemeData(elevation: 1, margin: EdgeInsets.zero),
       ),
       home: const AuthGate(),
@@ -123,27 +101,63 @@ class AuthGate extends StatelessWidget {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting)
-          return const Splash();
-        return snapshot.hasData ? const HomePage() : const LoginPage();
+        if (snapshot.connectionState == ConnectionState.waiting) return const Splash();
+        final user = snapshot.data;
+        if (user == null) return const LoginPage();
+        return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+          stream: FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots(),
+          builder: (context, profile) {
+            if (profile.connectionState == ConnectionState.waiting) return const Splash();
+            if (!profile.hasData || !profile.data!.exists) {
+              return const AccountPendingPage(message: 'Your account is waiting for Admin setup/approval.');
+            }
+            final data = profile.data!.data() ?? {};
+            final status = data['status']?.toString() ?? 'pending';
+            if (status != 'approved') {
+              return AccountPendingPage(message: status == 'disabled' ? 'Your account has been disabled by Admin.' : 'Your account is waiting for Admin approval.');
+            }
+            return const HomePage();
+          },
+        );
       },
     );
   }
 }
 
+class AccountPendingPage extends StatelessWidget {
+  final String message;
+  const AccountPendingPage({super.key, required this.message});
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        body: Center(
+          child: Card(
+            margin: const EdgeInsets.all(24),
+            child: Padding(
+              padding: const EdgeInsets.all(28),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                const Icon(Icons.hourglass_top, size: 64, color: orange),
+                const SizedBox(height: 16),
+                const Text('Approval Required', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 10),
+                Text(message, textAlign: TextAlign.center),
+                const SizedBox(height: 20),
+                FilledButton.icon(onPressed: () => FirebaseAuth.instance.signOut(), icon: const Icon(Icons.logout), label: const Text('SIGN OUT')),
+              ]),
+            ),
+          ),
+        ),
+      );
+}
+
 class Splash extends StatelessWidget {
   const Splash({super.key});
   @override
-  Widget build(BuildContext context) =>
-      const Scaffold(body: Center(child: CircularProgressIndicator()));
+  Widget build(BuildContext context) => const Scaffold(body: Center(child: CircularProgressIndicator()));
 }
 
 class Repo {
-  static final root = FirebaseFirestore.instance
-      .collection('sharedData')
-      .doc('dailyHisab');
-  static CollectionReference<Map<String, dynamic>> collection(String name) =>
-      root.collection(name);
+  static final root = FirebaseFirestore.instance.collection('sharedData').doc('dailyHisab');
+  static CollectionReference<Map<String, dynamic>> collection(String name) => root.collection(name);
 
   static Map<String, dynamic> withUser(Map<String, dynamic> data) {
     final user = FirebaseAuth.instance.currentUser;
@@ -151,6 +165,9 @@ class Repo {
       ...data,
       'createdBy': data['createdBy'] ?? user?.uid,
       'createdByEmail': data['createdByEmail'] ?? user?.email,
+      'deletionRequested': data['deletionRequested'] ?? false,
+      'updatedBy': user?.uid,
+      'updatedByEmail': user?.email,
       'updatedAt': FieldValue.serverTimestamp(),
     };
   }
@@ -164,30 +181,59 @@ class Repo {
   }
 
   static Future<void> add(String name, Map<String, dynamic> data) async {
-    await collection(name)
-        .add(withUser({...data, 'createdAt': FieldValue.serverTimestamp()}));
+    await collection(name).add(withUser({...data, 'createdAt': FieldValue.serverTimestamp()}));
   }
 
-  static Future<void> update(
-    String name,
-    String id,
-    Map<String, dynamic> data,
-  ) async {
-    await collection(name).doc(id).update(withUser(data));
+  static Future<void> update(String name, String id, Map<String, dynamic> data) async {
+    final doc = await collection(name).doc(id).get();
+    final existing = doc.data() ?? {};
+    await collection(name).doc(id).update({
+      ...data,
+      'createdBy': existing['createdBy'],
+      'createdByEmail': existing['createdByEmail'],
+      'deletionRequested': existing['deletionRequested'] ?? false,
+      'deletionRequestedBy': existing['deletionRequestedBy'],
+      'deletionRequestedByEmail': existing['deletionRequestedByEmail'],
+      'updatedBy': FirebaseAuth.instance.currentUser?.uid,
+      'updatedByEmail': FirebaseAuth.instance.currentUser?.email,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
   }
 
-  static Future<void> delete(String name, String id) =>
-      collection(name).doc(id).delete();
+  static Future<void> requestDeletion(String name, String id) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    final record = await collection(name).doc(id).get();
+    if (!record.exists) return;
+    final data = record.data() ?? {};
+    if (data['deletionRequested'] == true) return;
+    final request = FirebaseFirestore.instance.collection('deletionRequests').doc();
+    final batch = FirebaseFirestore.instance.batch();
+    batch.set(request, {
+      'collection': name,
+      'recordId': id,
+      'requestedBy': user.uid,
+      'requestedByEmail': user.email,
+      'status': 'pending',
+      'requestedAt': FieldValue.serverTimestamp(),
+    });
+    batch.update(collection(name).doc(id), {
+      'deletionRequested': true,
+      'deletionRequestedBy': user.uid,
+      'deletionRequestedByEmail': user.email,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+    await batch.commit();
+  }
+
+  static Future<void> delete(String name, String id) => collection(name).doc(id).delete();
 }
 
-void snack(BuildContext context, String message) =>
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+void snack(BuildContext context, String message) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
-  @override
-  State<LoginPage> createState() => _LoginPageState();
+  @override State<LoginPage> createState() => _LoginPageState();
 }
 
 class _LoginPageState extends State<LoginPage> {
@@ -197,24 +243,26 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> submit() async {
     if (!email.text.contains('@') || password.text.length < 6) {
-      snack(
-        context,
-        'Enter a valid email and password of at least 6 characters.',
-      );
+      snack(context, 'Enter a valid email and password of at least 6 characters.');
       return;
     }
     setState(() => busy = true);
     try {
       if (create) {
-        await FirebaseAuth.instance.createUserWithEmailAndPassword(
-          email: email.text.trim(),
-          password: password.text,
-        );
+        final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(email: email.text.trim(), password: password.text);
+        final user = credential.user;
+        if (user != null) {
+          await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+            'email': user.email,
+            'role': 'user',
+            'status': 'pending',
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+          await FirebaseAuth.instance.signOut();
+          if (mounted) snack(context, 'Registration successful. Your account is waiting for Admin approval.');
+        }
       } else {
-        await FirebaseAuth.instance.signInWithEmailAndPassword(
-          email: email.text.trim(),
-          password: password.text,
-        );
+        await FirebaseAuth.instance.signInWithEmailAndPassword(email: email.text.trim(), password: password.text);
       }
     } on FirebaseAuthException catch (e) {
       if (mounted) snack(context, e.message ?? e.code);
@@ -227,105 +275,30 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF432371), Color(0xFF7B4BB7), Color(0xFF00A896)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
+        decoration: const BoxDecoration(gradient: LinearGradient(colors: [Color(0xFF432371), Color(0xFF7B4BB7), Color(0xFF00A896)], begin: Alignment.topLeft, end: Alignment.bottomRight)),
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(22),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 430),
               child: Card(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(28),
-                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
                 child: Padding(
                   padding: const EdgeInsets.all(28),
                   child: Column(
                     children: [
-                      Container(
-                        width: 82,
-                        height: 82,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: LinearGradient(colors: [purple, teal]),
-                        ),
-                        child: const Icon(
-                          Icons.account_balance_wallet,
-                          color: Colors.white,
-                          size: 44,
-                        ),
-                      ),
+                      Container(width: 82, height: 82, decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [purple, teal])), child: const Icon(Icons.account_balance_wallet, color: Colors.white, size: 44)),
                       const SizedBox(height: 16),
-                      Text(
-                        'Daily Hisab',
-                        style: Theme.of(context).textTheme.headlineMedium
-                            ?.copyWith(fontWeight: FontWeight.bold),
-                      ),
+                      Text('Daily Hisab', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
                       const Text('Shared business accounting'),
                       const SizedBox(height: 24),
-                      TextField(
-                        controller: email,
-                        keyboardType: TextInputType.emailAddress,
-                        decoration: const InputDecoration(
-                          labelText: 'Email',
-                          prefixIcon: Icon(Icons.email_outlined),
-                        ),
-                      ),
+                      TextField(controller: email, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.email_outlined))),
                       const SizedBox(height: 12),
-                      TextField(
-                        controller: password,
-                        obscureText: !showPassword,
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          prefixIcon: const Icon(Icons.lock_outline),
-                          suffixIcon: IconButton(
-                            onPressed: () =>
-                                setState(() => showPassword = !showPassword),
-                            icon: Icon(
-                              showPassword
-                                  ? Icons.visibility_off
-                                  : Icons.visibility,
-                            ),
-                          ),
-                        ),
-                      ),
+                      TextField(controller: password, obscureText: !showPassword, decoration: InputDecoration(labelText: 'Password', prefixIcon: const Icon(Icons.lock_outline), suffixIcon: IconButton(onPressed: () => setState(() => showPassword = !showPassword), icon: Icon(showPassword ? Icons.visibility_off : Icons.visibility)))),
                       const SizedBox(height: 18),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 52,
-                        child: FilledButton(
-                          onPressed: busy ? null : submit,
-                          child: busy
-                              ? const SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : Text(create ? 'CREATE ACCOUNT' : 'LOGIN'),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: busy
-                            ? null
-                            : () => setState(() => create = !create),
-                        child: Text(
-                          create
-                              ? 'Already have an account? Login'
-                              : 'New user? Create account',
-                        ),
-                      ),
-                      const Text(
-                        'All authorized users see the same live business data.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.black54),
-                      ),
+                      SizedBox(width: double.infinity, height: 52, child: FilledButton(onPressed: busy ? null : submit, child: busy ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2)) : Text(create ? 'CREATE ACCOUNT' : 'LOGIN'))),
+                      TextButton(onPressed: busy ? null : () => setState(() => create = !create), child: Text(create ? 'Already have an account? Login' : 'New user? Create account')),
+                      const Text('All authorized users see the same live business data.', textAlign: TextAlign.center, style: TextStyle(color: Colors.black54)),
                     ],
                   ),
                 ),
@@ -340,50 +313,41 @@ class _LoginPageState extends State<LoginPage> {
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
-  @override
-  State<HomePage> createState() => _HomePageState();
+  @override State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
   int index = 0;
-  final pages = const [
-    DashboardPage(),
-    TransactionsPage(),
-    PartiesPage(),
-    ProductionPage(),
-    ReportsPage(),
-  ];
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(index: index, children: pages),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: index,
-        onDestinationSelected: (i) => setState(() => index = i),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.dashboard_outlined),
-            selectedIcon: Icon(Icons.dashboard),
-            label: 'Dashboard',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.swap_horiz),
-            label: 'Transactions',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.people_outline),
-            label: 'Parties',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.factory_outlined),
-            label: 'Production',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.assessment_outlined),
-            label: 'Reports',
-          ),
-        ],
-      ),
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
+      builder: (context, snap) {
+        final profile = snap.data?.data() ?? {};
+        final isAdmin = profile['role'] == 'admin';
+        final pages = <Widget>[
+          const DashboardPage(),
+          const TransactionsPage(),
+          const PartiesPage(),
+          const ProductionPage(),
+          const ReportsPage(),
+          if (isAdmin) const AdminPage(),
+        ];
+        final destinations = <NavigationDestination>[
+          const NavigationDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard), label: 'Dashboard'),
+          const NavigationDestination(icon: Icon(Icons.swap_horiz), label: 'Transactions'),
+          const NavigationDestination(icon: Icon(Icons.people_outline), label: 'Parties'),
+          const NavigationDestination(icon: Icon(Icons.factory_outlined), label: 'Production'),
+          const NavigationDestination(icon: Icon(Icons.assessment_outlined), label: 'Reports'),
+          if (isAdmin) const NavigationDestination(icon: Icon(Icons.admin_panel_settings_outlined), selectedIcon: Icon(Icons.admin_panel_settings), label: 'Admin'),
+        ];
+        if (index >= pages.length) index = 0;
+        return Scaffold(
+          body: IndexedStack(index: index, children: pages),
+          bottomNavigationBar: NavigationBar(selectedIndex: index, onDestinationSelected: (i) => setState(() => index = i), destinations: destinations),
+        );
+      },
     );
   }
 }
@@ -392,21 +356,13 @@ class PageTitle extends StatelessWidget implements PreferredSizeWidget {
   final String title;
   final List<Widget>? actions;
   const PageTitle(this.title, {super.key, this.actions});
-  @override
-  Size get preferredSize => const Size.fromHeight(68);
-  @override
-  Widget build(BuildContext context) => AppBar(
-    title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-    actions: actions,
-    backgroundColor: Colors.transparent,
-    elevation: 0,
-  );
+  @override Size get preferredSize => const Size.fromHeight(68);
+  @override Widget build(BuildContext context) => AppBar(title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)), actions: actions, backgroundColor: Colors.transparent, elevation: 0);
 }
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
-  @override
-  State<DashboardPage> createState() => _DashboardPageState();
+  @override State<DashboardPage> createState() => _DashboardPageState();
 }
 
 class _DashboardPageState extends State<DashboardPage> {
@@ -414,23 +370,7 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: PageTitle(
-        'Daily Hisab',
-        actions: [
-          IconButton(
-            onPressed: () => showAboutDialog(
-              context: context,
-              applicationName: 'Daily Hisab',
-              applicationVersion: '1.0',
-            ),
-            icon: const Icon(Icons.info_outline),
-          ),
-          IconButton(
-            onPressed: () => FirebaseAuth.instance.signOut(),
-            icon: const Icon(Icons.logout),
-          ),
-        ],
-      ),
+      appBar: PageTitle('Daily Hisab', actions: [IconButton(onPressed: () => showAboutDialog(context: context, applicationName: 'Daily Hisab', applicationVersion: '1.0'), icon: const Icon(Icons.info_outline)), IconButton(onPressed: () => FirebaseAuth.instance.signOut(), icon: const Icon(Icons.logout))]),
       body: StreamBuilder<List<Map<String, dynamic>>>(
         stream: Repo.stream('transactions'),
         builder: (context, txSnap) {
@@ -442,13 +382,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 builder: (context, prodSnap) {
                   return StreamBuilder<List<Map<String, dynamic>>>(
                     stream: Repo.stream('productionExpenses'),
-                    builder: (context, expSnap) => _body(
-                      context,
-                      txSnap.data ?? [],
-                      partySnap.data ?? [],
-                      prodSnap.data ?? [],
-                      expSnap.data ?? [],
-                    ),
+                    builder: (context, expSnap) => _body(context, txSnap.data ?? [], partySnap.data ?? [], prodSnap.data ?? [], expSnap.data ?? []),
                   );
                 },
               );
@@ -459,67 +393,17 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  Widget _body(
-    BuildContext context,
-    List<Map<String, dynamic>> tx,
-    List<Map<String, dynamic>> parties,
-    List<Map<String, dynamic>> production,
-    List<Map<String, dynamic>> expenses,
-  ) {
+  Widget _body(BuildContext context, List<Map<String, dynamic>> tx, List<Map<String, dynamic>> parties, List<Map<String, dynamic>> production, List<Map<String, dynamic>> expenses) {
     final range = periodRange(period);
-    final filtered = tx
-        .where(
-          (x) =>
-              !asDate(x['date']).isBefore(range.start) &&
-              !asDate(x['date']).isAfter(range.end),
-        )
-        .toList();
-    final receipts = filtered
-        .where((x) => x['type'] == 'Receipt')
-        .fold<double>(0, (s, x) => s + numValue(x['amount']));
-    final payments = filtered
-        .where((x) => x['type'] == 'Payment')
-        .fold<double>(0, (s, x) => s + numValue(x['amount']));
-    final cash = filtered
-        .where((x) => x['account'] == 'Cash')
-        .fold<double>(
-          0,
-          (s, x) =>
-              s +
-              (x['type'] == 'Receipt'
-                  ? numValue(x['amount'])
-                  : -numValue(x['amount'])),
-        );
-    final bank = filtered
-        .where((x) => x['account'] == 'Bank')
-        .fold<double>(
-          0,
-          (s, x) =>
-              s +
-              (x['type'] == 'Receipt'
-                  ? numValue(x['amount'])
-                  : -numValue(x['amount'])),
-        );
-    final receivable = parties
-        .where((x) => x['openingType'] == 'Receivable')
-        .fold<double>(0, (s, x) => s + numValue(x['opening']));
-    final payable = parties
-        .where((x) => x['openingType'] == 'Payable')
-        .fold<double>(0, (s, x) => s + numValue(x['opening']));
-    final productionQty = production
-        .where(
-          (x) =>
-              !asDate(x['date']).isBefore(range.start) &&
-              !asDate(x['date']).isAfter(range.end),
-        )
-        .fold<double>(0, (s, x) => s + numValue(x['quantity']));
-    final productionExpense = expenses
-        .where(
-          (x) =>
-              !asDate(x['date']).isBefore(range.start) &&
-              !asDate(x['date']).isAfter(range.end),
-        )
-        .fold<double>(0, (s, x) => s + numValue(x['amount']));
+    final filtered = tx.where((x) => !asDate(x['date']).isBefore(range.start) && !asDate(x['date']).isAfter(range.end)).toList();
+    final receipts = filtered.where((x) => x['type'] == 'Receipt').fold<double>(0, (s, x) => s + numValue(x['amount']));
+    final payments = filtered.where((x) => x['type'] == 'Payment').fold<double>(0, (s, x) => s + numValue(x['amount']));
+    final cash = filtered.where((x) => x['account'] == 'Cash').fold<double>(0, (s, x) => s + (x['type'] == 'Receipt' ? numValue(x['amount']) : -numValue(x['amount'])));
+    final bank = filtered.where((x) => x['account'] == 'Bank').fold<double>(0, (s, x) => s + (x['type'] == 'Receipt' ? numValue(x['amount']) : -numValue(x['amount'])));
+    final receivable = parties.where((x) => x['openingType'] == 'Receivable').fold<double>(0, (s, x) => s + numValue(x['opening']));
+    final payable = parties.where((x) => x['openingType'] == 'Payable').fold<double>(0, (s, x) => s + numValue(x['opening']));
+    final productionQty = production.where((x) => !asDate(x['date']).isBefore(range.start) && !asDate(x['date']).isAfter(range.end)).fold<double>(0, (s, x) => s + numValue(x['quantity']));
+    final productionExpense = expenses.where((x) => !asDate(x['date']).isBefore(range.start) && !asDate(x['date']).isAfter(range.end)).fold<double>(0, (s, x) => s + numValue(x['amount']));
 
     return RefreshIndicator(
       onRefresh: () async => setState(() {}),
@@ -528,136 +412,36 @@ class _DashboardPageState extends State<DashboardPage> {
         children: [
           Container(
             padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
-              gradient: const LinearGradient(
-                colors: [purple, teal],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Business Overview',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Live shared data • ${FirebaseAuth.instance.currentUser?.email ?? ''}',
-                  style: const TextStyle(color: Colors.white70),
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  initialValue: period,
-                  dropdownColor: Colors.white,
-                  decoration: const InputDecoration(
-                    labelText: 'Dashboard Period',
-                    fillColor: Colors.white,
-                  ),
-                  items:
-                      const [
-                            'Daily',
-                            'Monthly',
-                            'Quarterly',
-                            '6 Monthly',
-                            'Yearly',
-                          ]
-                          .map(
-                            (x) => DropdownMenuItem(value: x, child: Text(x)),
-                          )
-                          .toList(),
-                  onChanged: (x) => setState(() => period = x!),
-                ),
-              ],
-            ),
+            decoration: BoxDecoration(borderRadius: BorderRadius.circular(24), gradient: const LinearGradient(colors: [purple, teal], begin: Alignment.topLeft, end: Alignment.bottomRight)),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('Business Overview', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)), const SizedBox(height: 6), Text('Live shared data • ${FirebaseAuth.instance.currentUser?.email ?? ''}', style: const TextStyle(color: Colors.white70)), const SizedBox(height: 16), DropdownButtonFormField<String>(initialValue: period, dropdownColor: Colors.white, decoration: const InputDecoration(labelText: 'Dashboard Period', fillColor: Colors.white), items: const ['Daily', 'Monthly', 'Quarterly', '6 Monthly', 'Yearly'].map((x) => DropdownMenuItem(value: x, child: Text(x))).toList(), onChanged: (x) => setState(() => period = x!))]),
           ),
           const SizedBox(height: 16),
-          GridView.count(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 2,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: 1.55,
-            children: [
-              MetricCard(
-                'Receipts',
-                money(receipts),
-                Icons.arrow_downward,
-                teal,
-              ),
-              MetricCard('Payments', money(payments), Icons.arrow_upward, red),
-              MetricCard(
-                'Net Balance',
-                money(receipts - payments),
-                Icons.account_balance_wallet,
-                purple,
-              ),
-              MetricCard('Cash', money(cash), Icons.payments, orange),
-              MetricCard('Bank', money(bank), Icons.account_balance, blue),
-              MetricCard(
-                'Receivable',
-                money(receivable),
-                Icons.call_received,
-                teal,
-              ),
-              MetricCard('Payable', money(payable), Icons.call_made, red),
-              MetricCard(
-                'Production',
-                '${productionQty.toStringAsFixed(2)} units',
-                Icons.factory,
-                purple,
-              ),
-              MetricCard(
-                'Prod. Expenses',
-                money(productionExpense),
-                Icons.receipt_long,
-                orange,
-              ),
-            ],
-          ),
+          LayoutBuilder(builder: (context, constraints) {
+            final columns = constraints.maxWidth >= 900 ? 4 : constraints.maxWidth >= 600 ? 3 : 2;
+            return GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: columns,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              childAspectRatio: 1.0,
+              children: [
+                MetricCard('Receipts', money(receipts), Icons.arrow_downward, teal),
+                MetricCard('Payments', money(payments), Icons.arrow_upward, red),
+                MetricCard('Net Balance', money(receipts - payments), Icons.account_balance_wallet, purple),
+                MetricCard('Cash', money(cash), Icons.payments, orange),
+                MetricCard('Bank', money(bank), Icons.account_balance, blue),
+                MetricCard('Receivable', money(receivable), Icons.call_received, teal),
+                MetricCard('Payable', money(payable), Icons.call_made, red),
+                MetricCard('Production', '${productionQty.toStringAsFixed(2)} units', Icons.factory, purple),
+                MetricCard('Prod. Expenses', money(productionExpense), Icons.receipt_long, orange),
+              ],
+            );
+          }),
           const SizedBox(height: 20),
-          Text(
-            'Recent Transactions',
-            style: Theme.of(context).textTheme.titleLarge
-                ?.copyWith(fontWeight: FontWeight.bold),
-          ),
+          Text('Recent Transactions', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          if (filtered.isEmpty)
-            const EmptyState(
-              'No transactions yet',
-              'Add a receipt or payment from Transactions.',
-            )
-          else
-            ...filtered
-                .take(5)
-                .map(
-                  (x) => Card(
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: x['type'] == 'Receipt'
-                            ? teal.withValues(alpha: .12)
-                            : red.withValues(alpha: .12),
-                        child: Icon(
-                          x['type'] == 'Receipt'
-                              ? Icons.arrow_downward
-                              : Icons.arrow_upward,
-                          color: x['type'] == 'Receipt' ? teal : red,
-                        ),
-                      ),
-                      title: Text('${x['type']} • ${money(x['amount'])}'),
-                      subtitle: Text(
-                        '${dateText(x['date'])} • ${x['party'] ?? 'No party'}',
-                      ),
-                    ),
-                  ),
-                ),
+          if (filtered.isEmpty) const EmptyState('No transactions yet', 'Add a receipt or payment from Transactions.') else ...filtered.take(5).map((x) => Card(child: ListTile(leading: CircleAvatar(backgroundColor: x['type'] == 'Receipt' ? teal.withValues(alpha: .12) : red.withValues(alpha: .12), child: Icon(x['type'] == 'Receipt' ? Icons.arrow_downward : Icons.arrow_upward, color: x['type'] == 'Receipt' ? teal : red)), title: Text('${x['type']} • ${money(x['amount'])}'), subtitle: Text('${dateText(x['date'])} • ${x['party'] ?? 'No party'}')))),
         ],
       ),
     );
@@ -669,32 +453,19 @@ class MetricCard extends StatelessWidget {
   final IconData icon;
   final Color color;
   const MetricCard(this.title, this.value, this.icon, this.color, {super.key});
-  @override
-  Widget build(BuildContext context) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: color.withValues(alpha: .12),
-            child: Icon(icon, color: color, size: 19),
-          ),
-          const Spacer(),
-          Text(title, style: const TextStyle(color: Colors.black54)),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              value,
-              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
+  @override Widget build(BuildContext context) => Card(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.all(11),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            CircleAvatar(radius: 17, backgroundColor: color.withValues(alpha: .12), child: Icon(icon, color: color, size: 18)),
+            const Spacer(),
+            Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.black54, fontSize: 12)),
+            const SizedBox(height: 3),
+            FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: color))),
+          ]),
+        ),
+      );
 }
 
 class TransactionsPage extends StatefulWidget {
@@ -757,8 +528,8 @@ class _TransactionsPageState extends State<TransactionsPage> {
                             margin: const EdgeInsets.only(bottom: 8),
                             child: ListTile(
                               leading: CircleAvatar(
-                                backgroundColor: (receipt ? teal : red)
-                                    .withValues(alpha: .12),
+                                backgroundColor:
+                                    (receipt ? teal : red).withValues(alpha: .12),
                                 child: Icon(
                                   receipt
                                       ? Icons.arrow_downward
@@ -768,9 +539,7 @@ class _TransactionsPageState extends State<TransactionsPage> {
                               ),
                               title: Text(
                                 '${x['type']} • ${money(x['amount'])}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
+                                style: const TextStyle(fontWeight: FontWeight.bold),
                               ),
                               subtitle: Text(
                                 '${dateText(x['date'])} • ${x['account']} • ${x['party'] ?? 'No party'}\n${x['note'] ?? ''}',
@@ -782,22 +551,12 @@ class _TransactionsPageState extends State<TransactionsPage> {
                                     transactionDialog(context, existing: x);
                                   }
                                   if (v == 'delete') {
-                                    confirmDelete(
-                                      context,
-                                      'transactions',
-                                      x['id'],
-                                    );
+                                    requestDelete(context, 'transactions', x['id']);
                                   }
                                 },
                                 itemBuilder: (_) => const [
-                                  PopupMenuItem(
-                                    value: 'edit',
-                                    child: Text('Edit'),
-                                  ),
-                                  PopupMenuItem(
-                                    value: 'delete',
-                                    child: Text('Delete'),
-                                  ),
+                                  PopupMenuItem(value: 'edit', child: Text('Edit')),
+                                  PopupMenuItem(value: 'delete', child: Text('Delete')),
                                 ],
                               ),
                             ),
@@ -813,17 +572,10 @@ class _TransactionsPageState extends State<TransactionsPage> {
   }
 }
 
-Future<void> transactionDialog(
-  BuildContext context, {
-  Map<String, dynamic>? existing,
-}) async {
+Future<void> transactionDialog(BuildContext context, {Map<String, dynamic>? existing}) async {
   final date = TextEditingController(text: isoDate(asDate(existing?['date'])));
-  final amount = TextEditingController(
-    text: existing == null ? '' : '${existing['amount']}',
-  );
-  final party = TextEditingController(
-    text: existing?['party']?.toString() ?? '',
-  );
+  final amount = TextEditingController(text: existing == null ? '' : '${existing['amount']}');
+  final party = TextEditingController(text: existing?['party']?.toString() ?? '');
   final note = TextEditingController(text: existing?['note']?.toString() ?? '');
   String type = existing?['type']?.toString() ?? 'Receipt';
   String account = existing?['account']?.toString() ?? 'Cash';
@@ -834,9 +586,7 @@ Future<void> transactionDialog(
       return StatefulBuilder(
         builder: (ctx, set) {
           return AlertDialog(
-            title: Text(
-              existing == null ? 'Add Transaction' : 'Edit Transaction',
-            ),
+            title: Text(existing == null ? 'Add Transaction' : 'Edit Transaction'),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -852,9 +602,7 @@ Future<void> transactionDialog(
                   const SizedBox(height: 10),
                   TextField(
                     controller: amount,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     decoration: const InputDecoration(labelText: 'Amount'),
                   ),
                   const SizedBox(height: 10),
@@ -869,32 +617,23 @@ Future<void> transactionDialog(
                   const SizedBox(height: 10),
                   TextField(
                     controller: party,
-                    decoration: const InputDecoration(
-                      labelText: 'Party (optional)',
-                    ),
+                    decoration: const InputDecoration(labelText: 'Party (optional)'),
                   ),
                   const SizedBox(height: 10),
                   TextField(
                     controller: note,
-                    decoration: const InputDecoration(
-                      labelText: 'Description / Note',
-                    ),
+                    decoration: const InputDecoration(labelText: 'Description / Note'),
                   ),
                   const SizedBox(height: 10),
                   TextField(
                     controller: date,
-                    decoration: const InputDecoration(
-                      labelText: 'Date (YYYY-MM-DD)',
-                    ),
+                    decoration: const InputDecoration(labelText: 'Date (YYYY-MM-DD)'),
                   ),
                 ],
               ),
             ),
             actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancel'),
-              ),
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
               FilledButton(
                 onPressed: () async {
                   final d = DateTime.tryParse(date.text) ?? DateTime.now();
@@ -991,9 +730,7 @@ class _PartiesPageState extends State<PartiesPage> {
                               ),
                               title: Text(
                                 x['name'].toString(),
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
+                                style: const TextStyle(fontWeight: FontWeight.bold),
                               ),
                               subtitle: Text(
                                 '${x['phone'] ?? ''}\nOpening: ${money(x['opening'])} ${x['openingType']}',
@@ -1004,18 +741,12 @@ class _PartiesPageState extends State<PartiesPage> {
                                   if (v == 'edit') {
                                     partyDialog(context, existing: x);
                                   } else if (v == 'delete') {
-                                    confirmDelete(context, 'parties', x['id']);
+                                    requestDelete(context, 'parties', x['id']);
                                   }
                                 },
                                 itemBuilder: (_) => const [
-                                  PopupMenuItem(
-                                    value: 'edit',
-                                    child: Text('Edit'),
-                                  ),
-                                  PopupMenuItem(
-                                    value: 'delete',
-                                    child: Text('Delete'),
-                                  ),
+                                  PopupMenuItem(value: 'edit', child: Text('Edit')),
+                                  PopupMenuItem(value: 'delete', child: Text('Delete')),
                                 ],
                               ),
                             ),
@@ -1031,17 +762,10 @@ class _PartiesPageState extends State<PartiesPage> {
   }
 }
 
-Future<void> partyDialog(
-  BuildContext context, {
-  Map<String, dynamic>? existing,
-}) async {
+Future<void> partyDialog(BuildContext context, {Map<String, dynamic>? existing}) async {
   final name = TextEditingController(text: existing?['name']?.toString() ?? '');
-  final phone = TextEditingController(
-    text: existing?['phone']?.toString() ?? '',
-  );
-  final opening = TextEditingController(
-    text: existing == null ? '0' : '${existing['opening']}',
-  );
+  final phone = TextEditingController(text: existing?['phone']?.toString() ?? '');
+  final opening = TextEditingController(text: existing == null ? '0' : '${existing['opening']}');
   String openingType = existing?['openingType']?.toString() ?? 'Receivable';
 
   await showDialog<void>(
@@ -1053,30 +777,15 @@ Future<void> partyDialog(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(
-                controller: name,
-                decoration: const InputDecoration(labelText: 'Party Name'),
-              ),
+              TextField(controller: name, decoration: const InputDecoration(labelText: 'Party Name')),
               const SizedBox(height: 10),
-              TextField(
-                controller: phone,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(labelText: 'Phone'),
-              ),
+              TextField(controller: phone, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Phone')),
               const SizedBox(height: 10),
-              TextField(
-                controller: opening,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                decoration: const InputDecoration(labelText: 'Opening Balance'),
-              ),
+              TextField(controller: opening, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Opening Balance')),
               const SizedBox(height: 10),
               DropdownButtonFormField<String>(
                 initialValue: openingType,
-                items: const ['Receivable', 'Payable']
-                    .map((x) => DropdownMenuItem(value: x, child: Text(x)))
-                    .toList(),
+                items: const ['Receivable', 'Payable'].map((x) => DropdownMenuItem(value: x, child: Text(x))).toList(),
                 onChanged: (x) => set(() => openingType = x!),
                 decoration: const InputDecoration(labelText: 'Opening Type'),
               ),
@@ -1084,10 +793,7 @@ Future<void> partyDialog(
           ),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           FilledButton(
             onPressed: () async {
               if (name.text.trim().isEmpty) {
@@ -1117,115 +823,22 @@ Future<void> partyDialog(
 
 class ProductionPage extends StatefulWidget {
   const ProductionPage({super.key});
-  @override
-  State<ProductionPage> createState() => _ProductionPageState();
+  @override State<ProductionPage> createState() => _ProductionPageState();
 }
-
 class _ProductionPageState extends State<ProductionPage> {
   int section = 0;
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: PageTitle(
-      'Production',
-      actions: [
-        IconButton(
-          onPressed: () => section == 0
-              ? productionDialog(context)
-              : productionExpenseDialog(context),
-          icon: const Icon(Icons.add_circle),
-        ),
-      ],
-    ),
-    body: Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-          child: SegmentedButton<int>(
-            segments: const [
-              ButtonSegment(
-                value: 0,
-                label: Text('Production'),
-                icon: Icon(Icons.factory),
-              ),
-              ButtonSegment(
-                value: 1,
-                label: Text('Production Expenses'),
-                icon: Icon(Icons.receipt_long),
-              ),
-            ],
-            selected: {section},
-            onSelectionChanged: (s) => setState(() => section = s.first),
-          ),
-        ),
-        Expanded(
-          child: section == 0
-              ? const ProductionList()
-              : const ProductionExpenseList(),
-        ),
-      ],
-    ),
-  );
+  @override Widget build(BuildContext context) => Scaffold(appBar: PageTitle('Production', actions: [IconButton(onPressed: () => section == 0 ? productionDialog(context) : productionExpenseDialog(context), icon: const Icon(Icons.add_circle))]), body: Column(children: [Padding(padding: const EdgeInsets.fromLTRB(12, 0, 12, 8), child: SegmentedButton<int>(segments: const [ButtonSegment(value: 0, label: Text('Production'), icon: Icon(Icons.factory)), ButtonSegment(value: 1, label: Text('Production Expenses'), icon: Icon(Icons.receipt_long))], selected: {section}, onSelectionChanged: (s) => setState(() => section = s.first))), Expanded(child: section == 0 ? const ProductionList() : const ProductionExpenseList())]));
 }
 
 class ProductionList extends StatelessWidget {
   const ProductionList({super.key});
-  @override
-  Widget build(
-    BuildContext context,
-  ) => StreamBuilder<List<Map<String, dynamic>>>(
-    stream: Repo.stream('production'),
-    builder: (context, snap) {
-      final list = snap.data ?? [];
-      if (list.isEmpty)
-        return const EmptyState(
-          'No production records',
-          'Add your production quantity and unit.',
-        );
-      return ListView.builder(
-        padding: const EdgeInsets.all(12),
-        itemCount: list.length,
-        itemBuilder: (context, i) {
-          final x = list[i];
-          return Card(
-            margin: const EdgeInsets.only(bottom: 8),
-            child: ListTile(
-              leading: const CircleAvatar(child: Icon(Icons.factory)),
-              title: Text(
-                '${x['product']} • ${numValue(x['quantity']).toStringAsFixed(2)} ${x['unit']}',
-              ),
-              subtitle: Text(dateText(x['date'])),
-              trailing: PopupMenuButton<String>(
-                onSelected: (v) {
-                  if (v == 'edit') productionDialog(context, existing: x);
-                  if (v == 'delete')
-                    confirmDelete(context, 'production', x['id']);
-                },
-                itemBuilder: (_) => const [
-                  PopupMenuItem(value: 'edit', child: Text('Edit')),
-                  PopupMenuItem(value: 'delete', child: Text('Delete')),
-                ],
-              ),
-            ),
-          );
-        },
-      );
-    },
-  );
+  @override Widget build(BuildContext context) => StreamBuilder<List<Map<String, dynamic>>>(stream: Repo.stream('production'), builder: (context, snap) { final list = snap.data ?? []; if (list.isEmpty) return const EmptyState('No production records', 'Add your production quantity and unit.'); return ListView.builder(padding: const EdgeInsets.all(12), itemCount: list.length, itemBuilder: (context, i) { final x = list[i]; return Card(margin: const EdgeInsets.only(bottom: 8), child: ListTile(leading: const CircleAvatar(child: Icon(Icons.factory)), title: Text('${x['product']} • ${numValue(x['quantity']).toStringAsFixed(2)} ${x['unit']}'), subtitle: Text(dateText(x['date'])), trailing: PopupMenuButton<String>(onSelected: (v) { if (v == 'edit') productionDialog(context, existing: x); if (v == 'delete') requestDelete(context, 'production', x['id']); }, itemBuilder: (_) => const [PopupMenuItem(value: 'edit', child: Text('Edit')), PopupMenuItem(value: 'delete', child: Text('Delete'))]))); }); });
 }
 
-Future<void> productionDialog(
-  BuildContext context, {
-  Map<String, dynamic>? existing,
-}) async {
-  final product = TextEditingController(
-    text: existing?['product']?.toString() ?? '',
-  );
-  final quantity = TextEditingController(
-    text: existing == null ? '' : '${existing['quantity']}',
-  );
-  final unit = TextEditingController(
-    text: existing?['unit']?.toString() ?? 'kg',
-  );
+Future<void> productionDialog(BuildContext context, {Map<String, dynamic>? existing}) async {
+  final product = TextEditingController(text: existing?['product']?.toString() ?? '');
+  final quantity = TextEditingController(text: existing == null ? '' : '${existing['quantity']}');
+  final unit = TextEditingController(text: existing?['unit']?.toString() ?? 'kg');
   final date = TextEditingController(text: isoDate(asDate(existing?['date'])));
 
   await showDialog<void>(
@@ -1236,45 +849,25 @@ Future<void> productionDialog(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(
-              controller: product,
-              decoration: const InputDecoration(labelText: 'Product'),
-            ),
+            TextField(controller: product, decoration: const InputDecoration(labelText: 'Product')),
             const SizedBox(height: 10),
-            TextField(
-              controller: quantity,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              decoration: const InputDecoration(labelText: 'Quantity'),
-            ),
+            TextField(controller: quantity, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Quantity')),
             const SizedBox(height: 10),
-            TextField(
-              controller: unit,
-              decoration: const InputDecoration(labelText: 'Unit'),
-            ),
+            TextField(controller: unit, decoration: const InputDecoration(labelText: 'Unit')),
             const SizedBox(height: 10),
-            TextField(
-              controller: date,
-              decoration: const InputDecoration(labelText: 'Date (YYYY-MM-DD)'),
-            ),
+            TextField(controller: date, decoration: const InputDecoration(labelText: 'Date (YYYY-MM-DD)')),
           ],
         ),
       ),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx),
-          child: const Text('Cancel'),
-        ),
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
         FilledButton(
           onPressed: () async {
             final data = {
               'product': product.text.trim(),
               'quantity': numValue(quantity.text),
               'unit': unit.text.trim(),
-              'date': Timestamp.fromDate(
-                DateTime.tryParse(date.text) ?? DateTime.now(),
-              ),
+              'date': Timestamp.fromDate(DateTime.tryParse(date.text) ?? DateTime.now()),
             };
             if (existing == null) {
               await Repo.add('production', data);
@@ -1292,112 +885,41 @@ Future<void> productionDialog(
 
 class ProductionExpenseList extends StatelessWidget {
   const ProductionExpenseList({super.key});
-  @override
-  Widget build(BuildContext context) =>
-      StreamBuilder<List<Map<String, dynamic>>>(
-        stream: Repo.stream('productionExpenses'),
-        builder: (context, snap) {
-          final list = snap.data ?? [];
-          if (list.isEmpty)
-            return const EmptyState(
-              'No production expenses',
-              'Add expenses connected with production.',
-            );
-          return ListView.builder(
-            padding: const EdgeInsets.all(12),
-            itemCount: list.length,
-            itemBuilder: (context, i) {
-              final x = list[i];
-              return Card(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: ListTile(
-                  leading: const CircleAvatar(child: Icon(Icons.receipt_long)),
-                  title: Text('${x['name']} • ${money(x['amount'])}'),
-                  subtitle: Text(
-                    '${dateText(x['date'])}\n${x['description'] ?? ''}',
-                  ),
-                  isThreeLine: true,
-                  trailing: PopupMenuButton<String>(
-                    onSelected: (v) {
-                      if (v == 'edit')
-                        productionExpenseDialog(context, existing: x);
-                      if (v == 'delete')
-                        confirmDelete(context, 'productionExpenses', x['id']);
-                    },
-                    itemBuilder: (_) => const [
-                      PopupMenuItem(value: 'edit', child: Text('Edit')),
-                      PopupMenuItem(value: 'delete', child: Text('Delete')),
-                    ],
-                  ),
-                ),
-              );
-            },
-          );
-        },
-      );
+  @override Widget build(BuildContext context) => StreamBuilder<List<Map<String, dynamic>>>(stream: Repo.stream('productionExpenses'), builder: (context, snap) { final list = snap.data ?? []; if (list.isEmpty) return const EmptyState('No production expenses', 'Add expenses connected with production.'); return ListView.builder(padding: const EdgeInsets.all(12), itemCount: list.length, itemBuilder: (context, i) { final x = list[i]; return Card(margin: const EdgeInsets.only(bottom: 8), child: ListTile(leading: const CircleAvatar(child: Icon(Icons.receipt_long)), title: Text('${x['name']} • ${money(x['amount'])}'), subtitle: Text('${dateText(x['date'])}\n${x['description'] ?? ''}'), isThreeLine: true, trailing: PopupMenuButton<String>(onSelected: (v) { if (v == 'edit') productionExpenseDialog(context, existing: x); if (v == 'delete') requestDelete(context, 'productionExpenses', x['id']); }, itemBuilder: (_) => const [PopupMenuItem(value: 'edit', child: Text('Edit')), PopupMenuItem(value: 'delete', child: Text('Delete'))]))); }); });
 }
 
-Future<void> productionExpenseDialog(
-  BuildContext context, {
-  Map<String, dynamic>? existing,
-}) async {
+Future<void> productionExpenseDialog(BuildContext context, {Map<String, dynamic>? existing}) async {
   final name = TextEditingController(text: existing?['name']?.toString() ?? '');
-  final amount = TextEditingController(
-    text: existing == null ? '' : '${existing['amount']}',
-  );
+  final amount = TextEditingController(text: existing == null ? '' : '${existing['amount']}');
   final date = TextEditingController(text: isoDate(asDate(existing?['date'])));
-  final description = TextEditingController(
-    text: existing?['description']?.toString() ?? '',
-  );
+  final description = TextEditingController(text: existing?['description']?.toString() ?? '');
 
   await showDialog<void>(
     context: context,
     builder: (ctx) => AlertDialog(
-      title: Text(
-        existing == null ? 'Production Expense' : 'Edit Production Expense',
-      ),
+      title: Text(existing == null ? 'Production Expense' : 'Edit Production Expense'),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(
-              controller: name,
-              decoration: const InputDecoration(labelText: 'Expense Name'),
-            ),
+            TextField(controller: name, decoration: const InputDecoration(labelText: 'Expense Name')),
             const SizedBox(height: 10),
-            TextField(
-              controller: amount,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              decoration: const InputDecoration(labelText: 'Amount'),
-            ),
+            TextField(controller: amount, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Amount')),
             const SizedBox(height: 10),
-            TextField(
-              controller: date,
-              decoration: const InputDecoration(labelText: 'Date (YYYY-MM-DD)'),
-            ),
+            TextField(controller: date, decoration: const InputDecoration(labelText: 'Date (YYYY-MM-DD)')),
             const SizedBox(height: 10),
-            TextField(
-              controller: description,
-              decoration: const InputDecoration(labelText: 'Description'),
-            ),
+            TextField(controller: description, decoration: const InputDecoration(labelText: 'Description')),
           ],
         ),
       ),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx),
-          child: const Text('Cancel'),
-        ),
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
         FilledButton(
           onPressed: () async {
             final data = {
               'name': name.text.trim(),
               'amount': numValue(amount.text),
-              'date': Timestamp.fromDate(
-                DateTime.tryParse(date.text) ?? DateTime.now(),
-              ),
+              'date': Timestamp.fromDate(DateTime.tryParse(date.text) ?? DateTime.now()),
               'description': description.text.trim(),
             };
             if (existing == null) {
@@ -1416,10 +938,8 @@ Future<void> productionExpenseDialog(
 
 class ReportsPage extends StatefulWidget {
   const ReportsPage({super.key});
-  @override
-  State<ReportsPage> createState() => _ReportsPageState();
+  @override State<ReportsPage> createState() => _ReportsPageState();
 }
-
 class _ReportsPageState extends State<ReportsPage> {
   String report = 'Summary';
   DateTime from = DateTime(DateTime.now().year, DateTime.now().month, 1);
@@ -1427,360 +947,146 @@ class _ReportsPageState extends State<ReportsPage> {
   String? party;
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: const PageTitle('Reports'),
-    body: StreamBuilder<List<Map<String, dynamic>>>(
-      stream: Repo.stream('transactions'),
-      builder: (context, tx) => StreamBuilder<List<Map<String, dynamic>>>(
-        stream: Repo.stream('parties'),
-        builder: (context, parties) =>
-            StreamBuilder<List<Map<String, dynamic>>>(
-              stream: Repo.stream('production'),
-              builder: (context, production) =>
-                  StreamBuilder<List<Map<String, dynamic>>>(
-                    stream: Repo.stream('productionExpenses'),
-                    builder: (context, expenses) => _view(
-                      context,
-                      tx.data ?? [],
-                      parties.data ?? [],
-                      production.data ?? [],
-                      expenses.data ?? [],
-                    ),
-                  ),
-            ),
-      ),
-    ),
-  );
+  Widget build(BuildContext context) => Scaffold(appBar: const PageTitle('Reports'), body: StreamBuilder<List<Map<String, dynamic>>>(stream: Repo.stream('transactions'), builder: (context, tx) => StreamBuilder<List<Map<String, dynamic>>>(stream: Repo.stream('parties'), builder: (context, parties) => StreamBuilder<List<Map<String, dynamic>>>(stream: Repo.stream('production'), builder: (context, production) => StreamBuilder<List<Map<String, dynamic>>>(stream: Repo.stream('productionExpenses'), builder: (context, expenses) => _view(context, tx.data ?? [], parties.data ?? [], production.data ?? [], expenses.data ?? []))))));
 
-  Widget _view(
-    BuildContext context,
-    List<Map<String, dynamic>> tx,
-    List<Map<String, dynamic>> parties,
-    List<Map<String, dynamic>> production,
-    List<Map<String, dynamic>> expenses,
-  ) {
-    final list = tx.where((x) {
-      final d = asDate(x['date']);
-      return !d.isBefore(DateTime(from.year, from.month, from.day)) &&
-          !d.isAfter(DateTime(to.year, to.month, to.day, 23, 59, 59));
-    }).toList();
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        DropdownButtonFormField<String>(
-          initialValue: report,
-          items: const [
-            'Summary',
-            'Transactions',
-            'Party-wise',
-            'Party Statement',
-            'Outstanding',
-            'Production',
-            'Production Expenses',
-          ].map((x) => DropdownMenuItem(value: x, child: Text(x))).toList(),
-          onChanged: (x) => setState(() => report = x!),
-          decoration: const InputDecoration(labelText: 'Report Type'),
-        ),
-        const SizedBox(height: 12),
-        _dateRow(context, 'From', from, (d) => setState(() => from = d)),
-        _dateRow(context, 'To', to, (d) => setState(() => to = d)),
-        if (report == 'Party Statement') ...[
-          const SizedBox(height: 8),
-          DropdownButtonFormField<String>(
-            initialValue: party,
-            items: parties
-                .map(
-                  (x) => DropdownMenuItem(
-                    value: x['name'].toString(),
-                    child: Text(x['name'].toString()),
-                  ),
-                )
-                .toList(),
-            onChanged: (x) => setState(() => party = x),
-            decoration: const InputDecoration(labelText: 'Party'),
-          ),
-        ],
-        const SizedBox(height: 14),
-        Row(
-          children: [
-            Expanded(
-              child: FilledButton.icon(
-                onPressed: () => setState(() {}),
-                icon: const Icon(Icons.refresh),
-                label: const Text('GENERATE'),
-              ),
-            ),
-            const SizedBox(width: 10),
-            IconButton.filled(
-              onPressed: () => createPdf(report, list),
-              icon: const Icon(Icons.picture_as_pdf),
-            ),
-          ],
-        ),
-        const SizedBox(height: 14),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: _reportBody(list, parties, production, expenses),
-          ),
-        ),
-        const SizedBox(height: 12),
-        FilledButton.icon(
-          onPressed: () => copyReport(report, list),
-          icon: const Icon(Icons.copy),
-          label: const Text('COPY REPORT'),
-        ),
-      ],
-    );
+  Widget _view(BuildContext context, List<Map<String, dynamic>> tx, List<Map<String, dynamic>> parties, List<Map<String, dynamic>> production, List<Map<String, dynamic>> expenses) {
+    final list = tx.where((x) { final d = asDate(x['date']); return !d.isBefore(DateTime(from.year, from.month, from.day)) && !d.isAfter(DateTime(to.year, to.month, to.day, 23, 59, 59)); }).toList();
+    return ListView(padding: const EdgeInsets.all(16), children: [
+      DropdownButtonFormField<String>(initialValue: report, items: const ['Summary', 'Transactions', 'Party-wise', 'Party Statement', 'Outstanding', 'Production', 'Production Expenses'].map((x) => DropdownMenuItem(value: x, child: Text(x))).toList(), onChanged: (x) => setState(() => report = x!), decoration: const InputDecoration(labelText: 'Report Type')),
+      const SizedBox(height: 12),
+      _dateRow(context, 'From', from, (d) => setState(() => from = d)),
+      _dateRow(context, 'To', to, (d) => setState(() => to = d)),
+      if (report == 'Party Statement') ...[const SizedBox(height: 8), DropdownButtonFormField<String>(initialValue: party, items: parties.map((x) => DropdownMenuItem(value: x['name'].toString(), child: Text(x['name'].toString()))).toList(), onChanged: (x) => setState(() => party = x), decoration: const InputDecoration(labelText: 'Party'))],
+      const SizedBox(height: 14),
+      Row(children: [Expanded(child: FilledButton.icon(onPressed: () => setState(() {}), icon: const Icon(Icons.refresh), label: const Text('GENERATE'))), const SizedBox(width: 10), IconButton.filled(onPressed: () => createPdf(report, list), icon: const Icon(Icons.picture_as_pdf))]),
+      const SizedBox(height: 14),
+      Card(child: Padding(padding: const EdgeInsets.all(16), child: _reportBody(list, parties, production, expenses))),
+      const SizedBox(height: 12),
+      FilledButton.icon(onPressed: () => copyReport(report, list), icon: const Icon(Icons.copy), label: const Text('COPY REPORT')),
+    ]);
   }
 
-  Widget _dateRow(
-    BuildContext context,
-    String label,
-    DateTime value,
-    void Function(DateTime) change,
-  ) => Row(
-    children: [
-      Expanded(child: Text('$label: ${dateText(value)}')),
-      TextButton(
-        onPressed: () async {
-          final d = await showDatePicker(
-            context: context,
-            firstDate: DateTime(2020),
-            lastDate: DateTime(2100),
-            initialDate: value,
-          );
-          if (d != null) change(d);
-        },
-        child: const Text('Change'),
-      ),
-    ],
-  );
+  Widget _dateRow(BuildContext context, String label, DateTime value, void Function(DateTime) change) => Row(children: [Expanded(child: Text('$label: ${dateText(value)}')), TextButton(onPressed: () async { final d = await showDatePicker(context: context, firstDate: DateTime(2020), lastDate: DateTime(2100), initialDate: value); if (d != null) change(d); }, child: const Text('Change'))]);
 
-  Widget _reportBody(
-    List<Map<String, dynamic>> tx,
-    List<Map<String, dynamic>> parties,
-    List<Map<String, dynamic>> production,
-    List<Map<String, dynamic>> expenses,
-  ) {
-    final receipts = tx
-        .where((x) => x['type'] == 'Receipt')
-        .fold<double>(0, (s, x) => s + numValue(x['amount']));
-    final payments = tx
-        .where((x) => x['type'] == 'Payment')
-        .fold<double>(0, (s, x) => s + numValue(x['amount']));
-    if (report == 'Summary')
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Report Summary',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          Text('Receipts: ${money(receipts)}'),
-          Text('Payments: ${money(payments)}'),
-          Text('Net: ${money(receipts - payments)}'),
-          Text('Transactions: ${tx.length}'),
-        ],
-      );
-    if (report == 'Transactions')
-      return _lines(
-        tx
-            .map(
-              (x) =>
-                  '${dateText(x['date'])} • ${x['type']} • ${money(x['amount'])} • ${x['party'] ?? ''}',
-            )
-            .toList(),
-      );
+  Widget _reportBody(List<Map<String, dynamic>> tx, List<Map<String, dynamic>> parties, List<Map<String, dynamic>> production, List<Map<String, dynamic>> expenses) {
+    final receipts = tx.where((x) => x['type'] == 'Receipt').fold<double>(0, (s, x) => s + numValue(x['amount']));
+    final payments = tx.where((x) => x['type'] == 'Payment').fold<double>(0, (s, x) => s + numValue(x['amount']));
+    if (report == 'Summary') return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('Report Summary', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)), const SizedBox(height: 8), Text('Receipts: ${money(receipts)}'), Text('Payments: ${money(payments)}'), Text('Net: ${money(receipts - payments)}'), Text('Transactions: ${tx.length}')]);
+    if (report == 'Transactions') return _lines(tx.map((x) => '${dateText(x['date'])} • ${x['type']} • ${money(x['amount'])} • ${x['party'] ?? ''}').toList());
     if (report == 'Party-wise') {
-      final names = <String>{
-        ...parties.map((x) => x['name'].toString()),
-        ...tx.map((x) => x['party']?.toString() ?? ''),
-      }..remove('');
-      return _lines(
-        names.map((name) {
-          final rows = tx.where((x) => x['party'] == name);
-          final r = rows
-              .where((x) => x['type'] == 'Receipt')
-              .fold<double>(0, (s, x) => s + numValue(x['amount']));
-          final p = rows
-              .where((x) => x['type'] == 'Payment')
-              .fold<double>(0, (s, x) => s + numValue(x['amount']));
-          return '$name  |  Receipt ${money(r)}  |  Payment ${money(p)}  |  Net ${money(r - p)}';
-        }).toList(),
-      );
+      final names = <String>{...parties.map((x) => x['name'].toString()), ...tx.map((x) => x['party']?.toString() ?? '')}..remove('');
+      return _lines(names.map((name) { final rows = tx.where((x) => x['party'] == name); final r = rows.where((x) => x['type'] == 'Receipt').fold<double>(0, (s, x) => s + numValue(x['amount'])); final p = rows.where((x) => x['type'] == 'Payment').fold<double>(0, (s, x) => s + numValue(x['amount'])); return '$name  |  Receipt ${money(r)}  |  Payment ${money(p)}  |  Net ${money(r - p)}'; }).toList());
     }
-    if (report == 'Outstanding')
-      return _lines(
-        parties
-            .map(
-              (x) =>
-                  '${x['name']} • ${x['openingType']} • ${money(x['opening'])}',
-            )
-            .toList(),
-      );
-    if (report == 'Production')
-      return _lines(
-        production
-            .where(
-              (x) =>
-                  !asDate(x['date']).isBefore(from) &&
-                  !asDate(x['date']).isAfter(to.add(const Duration(days: 1))),
-            )
-            .map(
-              (x) =>
-                  '${dateText(x['date'])} • ${x['product']} • ${x['quantity']} ${x['unit']}',
-            )
-            .toList(),
-      );
-    if (report == 'Production Expenses')
-      return _lines(
-        expenses
-            .where(
-              (x) =>
-                  !asDate(x['date']).isBefore(from) &&
-                  !asDate(x['date']).isAfter(to.add(const Duration(days: 1))),
-            )
-            .map(
-              (x) =>
-                  '${dateText(x['date'])} • ${x['name']} • ${money(x['amount'])}',
-            )
-            .toList(),
-      );
+    if (report == 'Outstanding') return _lines(parties.map((x) => '${x['name']} • ${x['openingType']} • ${money(x['opening'])}').toList());
+    if (report == 'Production') return _lines(production.where((x) => !asDate(x['date']).isBefore(from) && !asDate(x['date']).isAfter(to.add(const Duration(days: 1)))).map((x) => '${dateText(x['date'])} • ${x['product']} • ${x['quantity']} ${x['unit']}').toList());
+    if (report == 'Production Expenses') return _lines(expenses.where((x) => !asDate(x['date']).isBefore(from) && !asDate(x['date']).isAfter(to.add(const Duration(days: 1)))).map((x) => '${dateText(x['date'])} • ${x['name']} • ${money(x['amount'])}').toList());
     if (party == null) return const Text('Select a party for its statement.');
     final rows = tx.where((x) => x['party'] == party).toList();
-    final opening = parties.firstWhere(
-      (x) => x['name'] == party,
-      orElse: () => {'opening': 0},
-    )['opening'];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Party: $party',
-          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-        ),
-        Text('Opening: ${money(opening)}'),
-        const SizedBox(height: 8),
-        ...rows.map(
-          (x) => Text(
-            '${dateText(x['date'])} • ${x['type']} • ${money(x['amount'])}',
-          ),
-        ),
-      ],
-    );
+    final opening = parties.firstWhere((x) => x['name'] == party, orElse: () => {'opening': 0})['opening'];
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Party: $party', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)), Text('Opening: ${money(opening)}'), const SizedBox(height: 8), ...rows.map((x) => Text('${dateText(x['date'])} • ${x['type']} • ${money(x['amount'])}'))]);
   }
 
-  Widget _lines(List<String> lines) => lines.isEmpty
-      ? const Text('No records for this report.')
-      : Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: lines
-              .map(
-                (x) => Padding(
-                  padding: const EdgeInsets.only(bottom: 7),
-                  child: Text(x),
-                ),
-              )
-              .toList(),
-        );
+  Widget _lines(List<String> lines) => lines.isEmpty ? const Text('No records for this report.') : Column(crossAxisAlignment: CrossAxisAlignment.start, children: lines.map((x) => Padding(padding: const EdgeInsets.only(bottom: 7), child: Text(x))).toList());
 }
 
 Future<void> copyReport(String type, List<Map<String, dynamic>> tx) async {
   final buffer = StringBuffer('Daily Hisab - $type\n');
   for (final x in tx) {
-    buffer.writeln(
-      '${dateText(x['date'])} • ${x['type']} • ${money(x['amount'])} • ${x['party'] ?? ''}',
-    );
+    buffer.writeln('${dateText(x['date'])} • ${x['type']} • ${money(x['amount'])} • ${x['party'] ?? ''}');
   }
   await Clipboard.setData(ClipboardData(text: buffer.toString()));
 }
 
 Future<void> createPdf(String type, List<Map<String, dynamic>> tx) async {
   final doc = pw.Document();
-  doc.addPage(
-    pw.MultiPage(
-      build: (context) => [
-        pw.Header(level: 0, text: 'Daily Hisab - $type'),
-        pw.Paragraph(text: 'Generated ${dateText(DateTime.now())}'),
-        pw.TableHelper.fromTextArray(
-          headers: const ['Date', 'Type', 'Party', 'Amount'],
-          data: tx
-              .map(
-                (x) => [
-                  dateText(x['date']),
-                  '${x['type']}',
-                  '${x['party'] ?? ''}',
-                  money(x['amount']),
-                ],
-              )
-              .toList(),
-        ),
-      ],
-    ),
-  );
-  await Printing.layoutPdf(
-    onLayout: (PdfPageFormat format) async => doc.save(),
-  );
+  doc.addPage(pw.MultiPage(build: (context) => [pw.Header(level: 0, text: 'Daily Hisab - $type'), pw.Paragraph(text: 'Generated ${dateText(DateTime.now())}'), pw.TableHelper.fromTextArray(headers: const ['Date', 'Type', 'Party', 'Amount'], data: tx.map((x) => [dateText(x['date']), '${x['type']}', '${x['party'] ?? ''}', money(x['amount'])]).toList())]));
+  await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => doc.save());
 }
 
 class EmptyState extends StatelessWidget {
   final String title, message;
   const EmptyState(this.title, this.message, {super.key});
-  @override
-  Widget build(BuildContext context) => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(40),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.inbox_outlined,
-            size: 64,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          const SizedBox(height: 12),
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleLarge
-                ?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            message,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.black54),
-          ),
-        ],
-      ),
-    ),
-  );
+  @override Widget build(BuildContext context) => Center(child: Padding(padding: const EdgeInsets.all(40), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.inbox_outlined, size: 64, color: Theme.of(context).colorScheme.primary), const SizedBox(height: 12), Text(title, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)), const SizedBox(height: 6), Text(message, textAlign: TextAlign.center, style: const TextStyle(color: Colors.black54))])));
 }
 
-Future<void> confirmDelete(
-  BuildContext context,
-  String collection,
-  String id,
-) async {
+Future<void> requestDelete(BuildContext context, String collection, String id) async {
   final ok = await showDialog<bool>(
     context: context,
     builder: (dialogContext) => AlertDialog(
-      title: const Text('Delete record?'),
-      content: const Text(
-        'This record will be removed for all authorized users.',
-      ),
+      title: const Text('Request deletion?'),
+      content: const Text('The record will remain in force until an Admin approves the deletion.'),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(dialogContext, false),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(dialogContext, true),
-          child: const Text('Delete'),
-        ),
+        TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
+        FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('REQUEST')),
       ],
     ),
   );
-  if (ok == true) await Repo.delete(collection, id);
+  if (ok == true) {
+    await Repo.requestDeletion(collection, id);
+    if (context.mounted) snack(context, 'Deletion request sent to Admin. The record remains in force.');
+  }
+}
+
+class AdminPage extends StatelessWidget {
+  const AdminPage({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: const PageTitle('Admin Panel'),
+      body: ListView(padding: const EdgeInsets.all(12), children: [
+        const Text('User approvals', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: FirebaseFirestore.instance.collection('users').orderBy('createdAt', descending: true).snapshots(),
+          builder: (context, snap) {
+            final docs = snap.data?.docs ?? [];
+            return Column(children: docs.map((doc) {
+              final d = doc.data();
+              final status = d['status']?.toString() ?? 'pending';
+              final role = d['role']?.toString() ?? 'user';
+              return Card(child: ListTile(
+                leading: CircleAvatar(child: Icon(role == 'admin' ? Icons.admin_panel_settings : Icons.person)),
+                title: Text(d['email']?.toString() ?? doc.id),
+                subtitle: Text('Status: $status • Role: $role'),
+                trailing: Wrap(spacing: 4, children: [
+                  if (status != 'approved') IconButton(tooltip: 'Approve', onPressed: () => doc.reference.update({'status': 'approved'}), icon: const Icon(Icons.check_circle, color: Colors.green)),
+                  if (status == 'approved' && role != 'admin') IconButton(tooltip: 'Disable', onPressed: () => doc.reference.update({'status': 'disabled'}), icon: const Icon(Icons.block, color: red)),
+                  if (status == 'disabled') IconButton(tooltip: 'Re-enable', onPressed: () => doc.reference.update({'status': 'approved'}), icon: const Icon(Icons.lock_open, color: teal)),
+                ]),
+              ));
+            }).toList());
+          },
+        ),
+        const SizedBox(height: 22),
+        const Text('Deletion approvals', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: FirebaseFirestore.instance.collection('deletionRequests').where('status', isEqualTo: 'pending').snapshots(),
+          builder: (context, snap) {
+            final docs = snap.data?.docs ?? [];
+            if (docs.isEmpty) return const Card(child: ListTile(title: Text('No pending deletion requests.')));
+            return Column(children: docs.map((doc) {
+              final d = doc.data();
+              final collection = d['collection']?.toString() ?? '';
+              final recordId = d['recordId']?.toString() ?? '';
+              return Card(child: ListTile(
+                title: Text('$collection / $recordId'),
+                subtitle: Text('Requested by ${d['requestedByEmail'] ?? d['requestedBy'] ?? ''}'),
+                trailing: Wrap(spacing: 4, children: [
+                  IconButton(tooltip: 'Approve deletion', onPressed: () async {
+                    await FirebaseFirestore.instance.collection('sharedData').doc('dailyHisab').collection(collection).doc(recordId).delete();
+                    await doc.reference.update({'status': 'approved', 'approvedAt': FieldValue.serverTimestamp(), 'approvedBy': FirebaseAuth.instance.currentUser?.uid});
+                  }, icon: const Icon(Icons.delete_forever, color: red)),
+                  IconButton(tooltip: 'Reject', onPressed: () async {
+                    await FirebaseFirestore.instance.collection('sharedData').doc('dailyHisab').collection(collection).doc(recordId).update({'deletionRequested': false, 'updatedAt': FieldValue.serverTimestamp()});
+                    await doc.reference.update({'status': 'rejected', 'rejectedAt': FieldValue.serverTimestamp(), 'rejectedBy': FirebaseAuth.instance.currentUser?.uid});
+                  }, icon: const Icon(Icons.close, color: orange)),
+                ]),
+              ));
+            }).toList());
+          },
+        ),
+      ]),
+    );
+  }
 }
