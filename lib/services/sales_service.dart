@@ -15,9 +15,38 @@ class SalesService {
   double calculateOutstanding(double net, double paid) => (net - paid).clamp(0.0, double.infinity);
   String paymentStatus(double net, double paid) => paid <= 0 ? 'Pending' : (paid >= net ? 'Paid' : 'Partial');
 
+  Future<bool> _isAdmin() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return false;
+    final snap = await _db.collection('users').doc(uid).get();
+    final data = snap.data() ?? <String,dynamic>{};
+    return data['role']?.toString() == 'admin' && data['status']?.toString() == 'approved';
+  }
+
   Future<String> addSale(Sale sale) => FirestoreService.instance.add('sales', sale.toMap());
-  Future<void> updateSale(Sale sale) => FirestoreService.instance.update('sales', sale.id, sale.toMap());
-  Future<void> deleteSale(String id) => FirestoreService.instance.delete('sales', id);
+
+  Future<void> updateSale(Sale sale) async {
+    if (await _isAdmin()) {
+      await FirestoreService.instance.update('sales', sale.id, sale.toMap());
+      return;
+    }
+    final u=FirebaseAuth.instance.currentUser;
+    if(u==null) throw StateError('Please sign in again.');
+    await _db.collection('changeRequests').add({
+      'action':'edit','collection':'sales','recordId':sale.id,'proposedData':sale.toMap(),
+      'requestedBy':u.uid,'requestedByEmail':u.email,'status':'pending','requestedAt':FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> deleteSale(String id) async {
+    if (await _isAdmin()) { await FirestoreService.instance.delete('sales', id); return; }
+    final u=FirebaseAuth.instance.currentUser;
+    if(u==null) throw StateError('Please sign in again.');
+    await _db.collection('changeRequests').add({
+      'action':'delete','collection':'sales','recordId':id,'requestedBy':u.uid,'requestedByEmail':u.email,
+      'status':'pending','requestedAt':FieldValue.serverTimestamp(),
+    });
+  }
 
   Stream<List<Sale>> watchSales() {
     final uid = FirebaseAuth.instance.currentUser?.uid;
@@ -26,20 +55,16 @@ class SalesService {
       final data = profile.data() ?? <String, dynamic>{};
       final role = data['role']?.toString();
       final shopId = data['shopId']?.toString();
-      if (role == 'retail_shop_user' && shopId != null && shopId.isNotEmpty) {
-        return watchShopSales(shopId);
-      }
+      if (role == 'retail_shop_user' && shopId != null && shopId.isNotEmpty) return watchShopSales(shopId);
       return _sales.snapshots().map((snapshot) {
         final sales = snapshot.docs.map((doc) => Sale.fromMap(doc.id, doc.data())).toList();
-        sales.sort((a, b) => b.date.compareTo(a.date));
-        return sales;
+        sales.sort((a, b) => b.date.compareTo(a.date)); return sales;
       });
     });
   }
 
   Stream<List<Sale>> watchShopSales(String shopId) => _sales.where('shopId', isEqualTo: shopId).snapshots().map((snapshot) {
-        final sales = snapshot.docs.map((doc) => Sale.fromMap(doc.id, doc.data())).toList();
-        sales.sort((a, b) => b.date.compareTo(a.date));
-        return sales;
-      });
+    final sales = snapshot.docs.map((doc) => Sale.fromMap(doc.id, doc.data())).toList();
+    sales.sort((a, b) => b.date.compareTo(a.date)); return sales;
+  });
 }
