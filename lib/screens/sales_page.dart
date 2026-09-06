@@ -51,8 +51,8 @@ class _SalesPageState extends State<SalesPage> {
   bool saving = false;
   String? editingSaleId;
 
-  double get grossAmount => rows.fold(0, (sum, row) => sum + row.amount);
-  double get commissionAmount => rows.fold(0, (sum, row) => sum + row.quantity) * (selectedShop?.commissionPerBox ?? 0);
+  double get grossAmount => rows.fold(0.0, (sum, row) => sum + row.amount);
+  double get commissionAmount => rows.fold(0.0, (sum, row) => sum + row.quantity) * (selectedShop?.commissionPerBox ?? 0);
   double get netAmount => (grossAmount - commissionAmount).clamp(0, double.infinity).toDouble();
   double get paymentReceived => (double.tryParse(paymentController.text.trim()) ?? 0).clamp(0, double.infinity).toDouble();
   double get outstanding => (netAmount - paymentReceived).clamp(0, double.infinity).toDouble();
