@@ -47,13 +47,14 @@ class BackupRestoreService {
 
   Future<String?> saveBackup() async {
     final json = await createBackupJson();
-    return FilePicker.saveFile(
+    final uri = await FilePicker.saveFile(
       dialogTitle: 'Save Daily Hisab Backup',
       fileName: _fileName(),
       type: FileType.custom,
       allowedExtensions: ['json'],
       bytes: Uint8List.fromList(utf8.encode(json)),
     );
+    return uri?.toFilePath();
   }
 
   Future<void> shareBackup() async {
@@ -69,12 +70,12 @@ class BackupRestoreService {
   }
 
   Future<int> restoreFromFile() async {
-    final result = await FilePicker.pickFiles(
+    final files = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['json'],
     );
-    if (result.files.isEmpty) return 0;
-    final bytes = await result.files.first.readAsBytes();
+    if (files.isEmpty) return 0;
+    final bytes = await files.first.readAsBytes();
     if (bytes.isEmpty) throw Exception('Unable to read the selected backup file.');
     final decoded = jsonDecode(utf8.decode(bytes));
     if (decoded is! Map<String, dynamic> || decoded['app'] != 'Daily Hisab') {
