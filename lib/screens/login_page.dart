@@ -1,8 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-import '../firebase_options.dart';
-import '../main.dart' show purple, teal;
+const _purple = Color(0xFF6C4AB6);
+const _teal = Color(0xFF00A896);
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -53,7 +53,7 @@ class _LoginPageState extends State<LoginPage> {
               child: Padding(
                 padding: const EdgeInsets.all(28),
                 child: Column(children: [
-                  Container(width: 82, height: 82, decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [purple, teal])), child: const Icon(Icons.account_balance_wallet, color: Colors.white, size: 44)),
+                  Container(width: 82, height: 82, decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [_purple, _teal])), child: const Icon(Icons.account_balance_wallet, color: Colors.white, size: 44)),
                   const SizedBox(height: 16),
                   Text('Daily Hisab', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
                   const Text('Shared business accounting'),
