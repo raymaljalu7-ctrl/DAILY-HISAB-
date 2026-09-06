@@ -3,18 +3,84 @@ import '../models/product.dart';
 import '../models/production.dart';
 import '../services/firestore_service.dart';
 
-class ProductionFixedPage extends StatefulWidget { const ProductionFixedPage({super.key}); @override State<ProductionFixedPage> createState()=>_ProductionFixedPageState(); }
+class ProductionFixedPage extends StatefulWidget {
+  const ProductionFixedPage({super.key});
+  @override State<ProductionFixedPage> createState() => _ProductionFixedPageState();
+}
 class _ProductionFixedPageState extends State<ProductionFixedPage> {
-  DateTime date=DateTime.now(); final rows=<Map<String,dynamic>>[{}]; bool saving=false;
-  String fmt(DateTime d)=>'${d.day.toString().padLeft(2,'0')}-${d.month.toString().padLeft(2,'0')}-${d.year}';
-  @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('Production')),body:StreamBuilder<List<Map<String,dynamic>>>(stream:FirestoreService.instance.stream('products'),builder:(context,snap){
-    if(snap.hasError)return Center(child:Text('Error loading products:\n${snap.error}')); if(!snap.hasData)return const Center(child:CircularProgressIndicator());
-    final products=(snap.data!..sort((a,b)=>(a['name']??'').toString().compareTo((b['name']??'').toString()))).where((x)=>x['active']!=false).map((x)=>Product.fromMap(x['id'].toString(),x)).toList();
-    if(products.isEmpty)return const Center(child:Text('Add active products in Master first.'));
-    return ListView(padding:const EdgeInsets.all(16),children:[InkWell(onTap:()async{final p=await showDatePicker(context:context,initialDate:date,firstDate:DateTime(2020),lastDate:DateTime(2100));if(p!=null)setState(()=>date=p);},child:InputDecorator(decoration:const InputDecoration(labelText:'Production Date',border:OutlineInputBorder()),child:Text(fmt(date)))),const SizedBox(height:14),
-      ...List.generate(rows.length,(i)=>_row(i,products)),const SizedBox(height:8),OutlinedButton.icon(onPressed:()=>setState(()=>rows.add({})),icon:const Icon(Icons.add),label:const Text('ADD ITEM')),const SizedBox(height:16),SizedBox(height:50,child:FilledButton.icon(onPressed:saving?null:()=>_save(products),icon:const Icon(Icons.save),label:Text(saving?'SAVING...':'SAVE PRODUCTION'))]);
-  }));
-  Widget _row(int i,List<Product> products){final r=rows[i];final controller=r['controller'] as TextEditingController? ?? TextEditingController();r['controller']=controller;return Card(margin:const EdgeInsets.only(bottom:10),child:Padding(padding:const EdgeInsets.all(12),child:Row(children:[Expanded(flex:2,child:DropdownButtonFormField<String>(initialValue:r['productId'] as String?,items:products.map((p)=>DropdownMenuItem(value:p.id,child:Text(p.name))).toList(),onChanged:(v)=>setState(()=>r['productId']=v),decoration:const InputDecoration(labelText:'Bakery Item',border:OutlineInputBorder()))),const SizedBox(width:10),Expanded(child:TextField(controller:controller,keyboardType:const TextInputType.numberWithOptions(decimal:true),decoration:const InputDecoration(labelText:'Quantity',suffixText:'Box',border:OutlineInputBorder()))),if(rows.length>1)IconButton(onPressed:()=>setState(()=>rows.removeAt(i)),icon:const Icon(Icons.delete_outline))])));}
-  Future<void> _save(List<Product> products)async{final entries=<Production>[];for(final r in rows){final pid=r['productId']?.toString();final q=double.tryParse((r['controller'] as TextEditingController?)?.text.trim()??'')??0;if(pid==null||q<=0)continue;final p=products.firstWhere((x)=>x.id==pid);entries.add(Production(id:'',date:date,productId:p.id,productName:p.name,quantity:q,unit:'Box'));}if(entries.isEmpty){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Select product and enter quantity.')));return;}setState(()=>saving=true);try{for(final e in entries)await FirestoreService.instance.add('production',e.toMap());if(mounted){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Production saved successfully.')));for(final r in rows){(r['controller'] as TextEditingController?)?.dispose();}rows..clear()..add({});setState(()=>saving=false);}}catch(e){if(mounted){setState(()=>saving=false);ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Unable to save production: $e')));}}}
+  DateTime date = DateTime.now();
+  final rows = <Map<String,dynamic>>[{}];
+  bool saving = false;
+  String fmt(DateTime d) => '${d.day.toString().padLeft(2,'0')}-${d.month.toString().padLeft(2,'0')}-${d.year}';
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Production')),
+      body: StreamBuilder<List<Map<String,dynamic>>>(
+        stream: FirestoreService.instance.stream('products'),
+        builder: (context, snap) {
+          if (snap.hasError) return Center(child: Text('Error loading products:\n${snap.error}'));
+          if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+          final products = snap.data!.where((x)=>x['active']!=false).map((x)=>Product.fromMap(x['id'].toString(),x)).toList()
+            ..sort((a,b)=>a.name.compareTo(b.name));
+          if (products.isEmpty) return const Center(child: Text('Add active products in Master first.'));
+          return ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              InkWell(
+                onTap: () async {
+                  final p = await showDatePicker(context:context, initialDate:date, firstDate:DateTime(2020), lastDate:DateTime(2100));
+                  if (p != null && mounted) setState(()=>date=p);
+                },
+                child: InputDecorator(decoration:const InputDecoration(labelText:'Production Date',border:OutlineInputBorder()),child:Text(fmt(date))),
+              ),
+              const SizedBox(height:14),
+              ...List.generate(rows.length,(i)=>_row(i,products)),
+              OutlinedButton.icon(onPressed:()=>setState(()=>rows.add({})),icon:const Icon(Icons.add),label:const Text('ADD ITEM')),
+              const SizedBox(height:16),
+              SizedBox(height:50,child:FilledButton.icon(onPressed:saving?null:()=>_save(products),icon:const Icon(Icons.save),label:Text(saving?'SAVING...':'SAVE PRODUCTION'))),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _row(int i,List<Product> products) {
+    final r=rows[i];
+    final controller = r['controller'] as TextEditingController? ?? TextEditingController();
+    r['controller']=controller;
+    return Card(
+      margin: const EdgeInsets.only(bottom:10),
+      child: Padding(padding:const EdgeInsets.all(12),child:Row(children:[
+        Expanded(flex:2,child:DropdownButtonFormField<String>(initialValue:r['productId'] as String?,items:products.map((p)=>DropdownMenuItem(value:p.id,child:Text(p.name))).toList(),onChanged:(v)=>setState(()=>r['productId']=v),decoration:const InputDecoration(labelText:'Bakery Item',border:OutlineInputBorder()))),
+        const SizedBox(width:10),
+        Expanded(child:TextField(controller:controller,keyboardType:const TextInputType.numberWithOptions(decimal:true),decoration:const InputDecoration(labelText:'Quantity',suffixText:'Box',border:OutlineInputBorder()))),
+        if(rows.length>1) IconButton(onPressed:(){final c=r['controller'] as TextEditingController?;c?.dispose();setState(()=>rows.removeAt(i));},icon:const Icon(Icons.delete_outline)),
+      ])),
+    );
+  }
+
+  Future<void> _save(List<Product> products) async {
+    final entries=<Production>[];
+    for(final r in rows){
+      final pid=r['productId']?.toString();
+      final q=double.tryParse((r['controller'] as TextEditingController?)?.text.trim()??'')??0;
+      if(pid==null||q<=0)continue;
+      final p=products.firstWhere((x)=>x.id==pid);
+      entries.add(Production(id:'',date:date,productId:p.id,productName:p.name,quantity:q,unit:'Box'));
+    }
+    if(entries.isEmpty){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Select product and enter quantity.')));return;}
+    setState(()=>saving=true);
+    try{
+      for(final e in entries) await FirestoreService.instance.add('production',e.toMap());
+      if(!mounted)return;
+      for(final r in rows){(r['controller'] as TextEditingController?)?.dispose();}
+      rows..clear()..add({});
+      setState(()=>saving=false);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Production saved successfully.')));
+    }catch(e){if(mounted){setState(()=>saving=false);ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Unable to save production: $e')));}}
+  }
   @override void dispose(){for(final r in rows){(r['controller'] as TextEditingController?)?.dispose();}super.dispose();}
 }
