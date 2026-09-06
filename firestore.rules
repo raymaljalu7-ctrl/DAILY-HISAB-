@@ -2,48 +2,25 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    function signedIn() {
-      return request.auth != null;
-    }
-
-    function myUid() {
-      return request.auth.uid;
-    }
-
-    function myProfile() {
-      return get(/databases/$(database)/documents/users/$(myUid())).data;
-    }
-
-    function isApproved() {
-      return signedIn() && myProfile().status == 'approved';
-    }
-
-    function isAdmin() {
-      return signedIn() && myProfile().status == 'approved' && myProfile().role == 'admin';
-    }
+    function signedIn() { return request.auth != null; }
+    function myUid() { return request.auth.uid; }
+    function myProfile() { return get(/databases/$(database)/documents/users/$(myUid())).data; }
+    function isApproved() { return signedIn() && myProfile().status == 'approved'; }
+    function isAdmin() { return isApproved() && myProfile().role == 'admin'; }
 
     match /users/{uid} {
       allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
-
-      // A newly registered user can create only their own pending user profile.
-      // They cannot make themselves an admin or approve themselves.
-      allow create: if signedIn()
-        && request.auth.uid == uid
+      allow create: if signedIn() && request.auth.uid == uid
         && request.resource.data.role == 'user'
         && request.resource.data.status == 'pending';
-
-      // Only Admin can approve, disable, change roles, or remove user profiles.
       allow update, delete: if isAdmin();
     }
 
     match /sharedData/dailyHisab/{document=**} {
       allow read: if isApproved();
-
       allow create: if isApproved()
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.deletionRequested == false;
-
       allow update: if isAdmin()
         || (
           isApproved()
@@ -51,8 +28,6 @@ service cloud.firestore {
           && request.resource.data.createdBy == resource.data.createdBy
           && request.resource.data.createdByEmail == resource.data.createdByEmail
           && request.resource.data.deletionRequested == resource.data.deletionRequested
-          && request.resource.data.deletionRequestedBy == resource.data.deletionRequestedBy
-          && request.resource.data.deletionRequestedByEmail == resource.data.deletionRequestedByEmail
         )
         || (
           isApproved()
@@ -63,8 +38,6 @@ service cloud.firestore {
           && request.resource.data.createdBy == resource.data.createdBy
           && request.resource.data.createdByEmail == resource.data.createdByEmail
         );
-
-      // Permanent deletion is Admin-only. Normal users must request deletion.
       allow delete: if isAdmin();
     }
 
@@ -72,6 +45,14 @@ service cloud.firestore {
       allow create: if isApproved()
         && request.resource.data.requestedBy == request.auth.uid
         && request.resource.data.status == 'pending';
+      allow read, update, delete: if isAdmin();
+    }
+
+    match /changeRequests/{requestId} {
+      allow create: if isApproved()
+        && request.resource.data.requestedBy == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.action in ['edit', 'delete'];
       allow read, update, delete: if isAdmin();
     }
   }
