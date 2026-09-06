@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:typed_data';
-import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:share_plus/share_plus.dart';
@@ -16,14 +15,20 @@ class BackupRestoreService {
     'productionExpenses','salary','capital','commissions','products',
     'retailShops','parties','workers','openingBalances',
   ];
+
   CollectionReference<Map<String,dynamic>> _collection(String name) => _db.collection(_rootCollection).doc(_rootDocument).collection(name);
 
   Future<Map<String,dynamic>> createBackup() async {
-    final backup = <String,dynamic>{'backupVersion':2,'app':'Daily Hisab','createdAt':DateTime.now().toUtc().toIso8601String(),'collections':<String,dynamic>{}};
+    final backup = <String,dynamic>{
+      'backupVersion': 2,
+      'app': 'Daily Hisab',
+      'createdAt': DateTime.now().toUtc().toIso8601String(),
+      'collections': <String,dynamic>{},
+    };
     final collections = backup['collections'] as Map<String,dynamic>;
     for (final name in businessCollections) {
       final snapshot = await _collection(name).get();
-      collections[name] = snapshot.docs.map((doc)=>{'id':doc.id,'data':_encodeValue(doc.data())}).toList();
+      collections[name] = snapshot.docs.map((doc) => {'id': doc.id, 'data': _encodeValue(doc.data())}).toList();
     }
     return backup;
   }
@@ -32,26 +37,22 @@ class BackupRestoreService {
 
   String _fileName() {
     final now = DateTime.now();
-    String two(int n) => n.toString().padLeft(2,'0');
+    String two(int n) => n.toString().padLeft(2, '0');
     return 'Daily_Hisab_Backup_${now.year}-${two(now.month)}-${two(now.day)}_${two(now.hour)}-${two(now.minute)}-${two(now.second)}.json';
   }
 
   Future<String?> saveBackup() async {
     final json = await createBackupJson();
-    final bytes = Uint8List.fromList(utf8.encode(json));
-    return FilePicker.platform.saveFile(
+    return FilePicker.saveFile(
       dialogTitle: 'Save Daily Hisab Backup',
       fileName: _fileName(),
       type: FileType.custom,
       allowedExtensions: ['json'],
-      bytes: bytes,
+      bytes: Uint8List.fromList(utf8.encode(json)),
     );
   }
 
-  /// Kept for compatibility with the existing Admin button. It now saves the real JSON file using the device save dialog.
-  Future<void> shareBackup() async {
-    await saveBackup();
-  }
+  Future<void> shareBackup() async => saveBackup();
 
   Future<void> shareSavedBackup(String path) async {
     await SharePlus.instance.share(ShareParams(
@@ -62,20 +63,26 @@ class BackupRestoreService {
   }
 
   Future<int> restoreFromFile() async {
-    final file = await FilePicker.pickFile(type:FileType.custom,allowedExtensions:['json']);
-    if (file == null) return 0;
-    final decoded = jsonDecode(utf8.decode(await file.readAsBytes()));
+    final result = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: ['json'], withData: true);
+    if (result == null || result.files.isEmpty) return 0;
+    final file = result.files.single;
+    final bytes = file.bytes;
+    if (bytes == null) throw Exception('Unable to read the selected backup file.');
+    final decoded = jsonDecode(utf8.decode(bytes));
     if (decoded is! Map<String,dynamic> || decoded['app'] != 'Daily Hisab') throw Exception('Invalid Daily Hisab backup file.');
     final collections = decoded['collections'];
     if (collections is! Map<String,dynamic>) throw Exception('Backup file contains no business data.');
     int count = 0;
     for (final name in businessCollections) {
-      final records = collections[name]; if (records is! List) continue;
+      final records = collections[name];
+      if (records is! List) continue;
       for (final record in records) {
         if (record is! Map) continue;
-        final id = record['id']?.toString(); final raw = record['data'];
+        final id = record['id']?.toString();
+        final raw = record['data'];
         if (id == null || raw is! Map) continue;
-        await _collection(name).doc(id).set(_decodeMap(Map<String,dynamic>.from(raw))); count++;
+        await _collection(name).doc(id).set(_decodeMap(Map<String,dynamic>.from(raw)));
+        count++;
       }
     }
     return count;
@@ -91,6 +98,7 @@ class BackupRestoreService {
     if (value is Uint8List) return {'__type':'bytes','value':base64Encode(value)};
     return value;
   }
+
   Map<String,dynamic> _decodeMap(Map<String,dynamic> map) => map.map((k,v)=>MapEntry(k,_decodeValue(v)));
   dynamic _decodeValue(dynamic value) {
     if (value is Map) {
