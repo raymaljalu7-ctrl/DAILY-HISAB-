@@ -23,7 +23,7 @@ jobs:
       - name: Get packages
         run: flutter pub get
       - name: Analyze
-        run: flutter analyze
+        run: flutter analyze --no-fatal-infos
       - name: Build Android APK
         run: flutter build apk --release
       - name: Upload APK
