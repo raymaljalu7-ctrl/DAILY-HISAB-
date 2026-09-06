@@ -45,7 +45,7 @@ class BackupRestoreService {
     return 'Daily_Hisab_Backup_${now.year}-${two(now.month)}-${two(now.day)}_${two(now.hour)}-${two(now.minute)}-${two(now.second)}.json';
   }
 
-  Future<Uri?> saveBackup() async {
+  Future<String?> saveBackup() async {
     final json = await createBackupJson();
     return FilePicker.saveFile(
       dialogTitle: 'Save Daily Hisab Backup',
@@ -69,15 +69,13 @@ class BackupRestoreService {
   }
 
   Future<int> restoreFromFile() async {
-    final files = await FilePicker.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['json'],
     );
-    if (files.isEmpty) return 0;
-    final bytes = await files.first.readAsBytes();
-    if (bytes.isEmpty) {
-      throw Exception('Unable to read the selected backup file.');
-    }
+    if (result.files.isEmpty) return 0;
+    final bytes = await result.files.first.readAsBytes();
+    if (bytes.isEmpty) throw Exception('Unable to read the selected backup file.');
     final decoded = jsonDecode(utf8.decode(bytes));
     if (decoded is! Map<String, dynamic> || decoded['app'] != 'Daily Hisab') {
       throw Exception('Invalid Daily Hisab backup file.');
@@ -95,9 +93,7 @@ class BackupRestoreService {
         final id = record['id']?.toString();
         final raw = record['data'];
         if (id == null || raw is! Map) continue;
-        await _collection(name).doc(id).set(
-          _decodeMap(Map<String, dynamic>.from(raw)),
-        );
+        await _collection(name).doc(id).set(_decodeMap(Map<String, dynamic>.from(raw)));
         count++;
       }
     }
@@ -105,25 +101,13 @@ class BackupRestoreService {
   }
 
   dynamic _encodeValue(dynamic value) {
-    if (value is Timestamp) {
-      return {'__type': 'timestamp', 'value': value.toDate().toUtc().toIso8601String()};
-    }
-    if (value is DateTime) {
-      return {'__type': 'datetime', 'value': value.toUtc().toIso8601String()};
-    }
-    if (value is GeoPoint) {
-      return {'__type': 'geopoint', 'latitude': value.latitude, 'longitude': value.longitude};
-    }
-    if (value is DocumentReference) {
-      return {'__type': 'documentReference', 'path': value.path};
-    }
-    if (value is Map) {
-      return value.map((k, v) => MapEntry(k.toString(), _encodeValue(v)));
-    }
+    if (value is Timestamp) return {'__type': 'timestamp', 'value': value.toDate().toUtc().toIso8601String()};
+    if (value is DateTime) return {'__type': 'datetime', 'value': value.toUtc().toIso8601String()};
+    if (value is GeoPoint) return {'__type': 'geopoint', 'latitude': value.latitude, 'longitude': value.longitude};
+    if (value is DocumentReference) return {'__type': 'documentReference', 'path': value.path};
+    if (value is Map) return value.map((k, v) => MapEntry(k.toString(), _encodeValue(v)));
     if (value is List) return value.map(_encodeValue).toList();
-    if (value is Uint8List) {
-      return {'__type': 'bytes', 'value': base64Encode(value)};
-    }
+    if (value is Uint8List) return {'__type': 'bytes', 'value': base64Encode(value)};
     return value;
   }
 
@@ -133,15 +117,8 @@ class BackupRestoreService {
   dynamic _decodeValue(dynamic value) {
     if (value is Map) {
       final type = value['__type'];
-      if (type == 'timestamp' || type == 'datetime') {
-        return Timestamp.fromDate(DateTime.parse(value['value'].toString()).toUtc());
-      }
-      if (type == 'geopoint') {
-        return GeoPoint(
-          (value['latitude'] as num).toDouble(),
-          (value['longitude'] as num).toDouble(),
-        );
-      }
+      if (type == 'timestamp' || type == 'datetime') return Timestamp.fromDate(DateTime.parse(value['value'].toString()).toUtc());
+      if (type == 'geopoint') return GeoPoint((value['latitude'] as num).toDouble(), (value['longitude'] as num).toDouble());
       if (type == 'documentReference') return _db.doc(value['path'].toString());
       if (type == 'bytes') return base64Decode(value['value'].toString());
       return value.map((k, v) => MapEntry(k.toString(), _decodeValue(v)));
