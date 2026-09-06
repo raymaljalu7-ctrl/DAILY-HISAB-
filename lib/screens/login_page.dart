@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -27,13 +28,16 @@ class _LoginPageState extends State<LoginPage> {
     setState(() => busy = true);
     try {
       if (create) {
-        await FirebaseAuth.instance.createUserWithEmailAndPassword(email: email.text.trim(), password: password.text);
+        final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(email: email.text.trim(), password: password.text);
+        await FirebaseFirestore.instance.collection('users').doc(cred.user!.uid).set({'email': email.text.trim(), 'role': 'user', 'status': 'pending', 'createdAt': FieldValue.serverTimestamp()});
         _snack('Account created. Please wait for Admin approval.');
       } else {
         await FirebaseAuth.instance.signInWithEmailAndPassword(email: email.text.trim(), password: password.text);
       }
     } on FirebaseAuthException catch (e) {
       if (mounted) _snack(e.message ?? e.code);
+    } catch (e) {
+      if (mounted) _snack('Unable to create account: $e');
     } finally {
       if (mounted) setState(() => busy = false);
     }
