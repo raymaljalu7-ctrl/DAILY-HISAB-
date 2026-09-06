@@ -1,0 +1,139 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+
+class ReportsV2Page extends StatefulWidget {
+  const ReportsV2Page({super.key});
+  @override State<ReportsV2Page> createState() => _ReportsV2PageState();
+}
+
+class _ReportsV2PageState extends State<ReportsV2Page> {
+  final db = FirebaseFirestore.instance;
+  String report = 'Sales';
+  String period = 'Daily';
+  DateTime from = DateTime.now();
+  DateTime to = DateTime.now();
+  bool loading = false;
+  String? error;
+  List<Map<String,dynamic>> rows = [];
+  List<Map<String,dynamic>> shops = [];
+  List<Map<String,dynamic>> products = [];
+  String? shopId;
+  String? productId;
+
+  final types = const ['Sales','Receipt','Payments','Outstanding','Commission','Production','Expenses','Salary','Capital','Stock Management','Cash Management','Profit/Loss'];
+
+  CollectionReference<Map<String,dynamic>> c(String n) => db.collection('sharedData').doc('dailyHisab').collection(n);
+  double n(dynamic v) => v is num ? v.toDouble() : double.tryParse('$v') ?? 0;
+  DateTime d(dynamic v) => v is Timestamp ? v.toDate() : v is DateTime ? v : DateTime.fromMillisecondsSinceEpoch(0);
+  bool inRange(DateTime x) => !x.isBefore(DateTime(from.year,from.month,from.day)) && !x.isAfter(DateTime(to.year,to.month,to.day,23,59,59));
+  String money(dynamic v) => '₹${n(v).toStringAsFixed(2)}';
+  String date(DateTime x) => '${x.day.toString().padLeft(2,'0')}-${x.month.toString().padLeft(2,'0')}-${x.year}';
+
+  @override void initState() { super.initState(); _loadMasters().then((_) => _load()); }
+
+  Future<void> _loadMasters() async {
+    try {
+      final a = await Future.wait([c('retailShops').get(), c('products').get()]);
+      if (!mounted) return;
+      setState(() {
+        shops = a[0].docs.map((x)=>{'id':x.id,...x.data()}).where((x)=>x['active']!=false).toList();
+        products = a[1].docs.map((x)=>{'id':x.id,...x.data()}).where((x)=>x['active']!=false).toList();
+      });
+    } catch (_) {}
+  }
+
+  void setPeriod(String v) {
+    final now = DateTime.now(); DateTime a=now,b=now;
+    if (v=='Monthly') { a=DateTime(now.year,now.month,1); b=DateTime(now.year,now.month+1,0); }
+    if (v=='Quarterly') { final m=((now.month-1)~/3)*3+1; a=DateTime(now.year,m,1); b=DateTime(now.year,m+3,0); }
+    if (v=='6 Monthly') { final m=now.month<=6?1:7; a=DateTime(now.year,m,1); b=DateTime(now.year,m+6,0); }
+    if (v=='Yearly') { a=DateTime(now.year,1,1); b=DateTime(now.year,12,31); }
+    setState(() { period=v; from=a; to=b; }); _load();
+  }
+
+  Future<List<Map<String,dynamic>>> coll(String name) async {
+    final snap=await c(name).get();
+    return snap.docs.map((x)=>{'id':x.id,...x.data()}).where((x)=>inRange(d(x['date']))).toList();
+  }
+
+  Future<void> _load() async {
+    if (!mounted) return;
+    setState(() {loading=true; error=null;});
+    try {
+      List<Map<String,dynamic>> out=[];
+      if (report=='Sales'||report=='Outstanding'||report=='Commission') {
+        out=await coll('sales');
+        if (shopId!=null) out=out.where((x)=>x['shopId']?.toString()==shopId).toList();
+        if (productId!=null) out=out.where((x)=>(x['items'] is List)&&((x['items'] as List).any((i)=>i is Map&&i['productId']?.toString()==productId))).toList();
+        if (report=='Outstanding') out=out.where((x)=>n(x['outstanding'])>0).toList();
+      } else if (report=='Receipt') {
+        out=await coll('transactions'); out=out.where((x)=>x['type']?.toString()=='Receipt').toList();
+      } else if (report=='Payments') {
+        out=await coll('transactions'); out=out.where((x)=>x['type']?.toString()=='Payment').toList();
+      } else if (report=='Production') out=await coll('production');
+      else if (report=='Expenses') out=await coll('productionExpenses');
+      else if (report=='Salary') out=await coll('salary');
+      else if (report=='Capital') out=await coll('capital');
+      else if (report=='Stock Management') out=await _stockReport();
+      else if (report=='Cash Management') out=await _cashReport();
+      else if (report=='Profit/Loss') out=await _profitLoss();
+      out.sort((a,b)=>d(b['date']).compareTo(d(a['date'])));
+      if (mounted) setState(() {rows=out;loading=false;});
+    } catch(e) { if(mounted) setState(() {error='$e';loading=false;}); }
+  }
+
+  Future<List<Map<String,dynamic>>> _stockReport() async {
+    final p=await coll('production'); final t=await coll('stockTransfers'); final r=await coll('stockOtherReceived'); final s=await coll('sales');
+    final out=<Map<String,dynamic>>[];
+    for(final x in products) {
+      final id=x['id'].toString(); double made=0,moved=0,received=0,sold=0;
+      for(final z in p) if(z['productId']==id) made+=n(z['quantity']);
+      for(final z in t) if(z['productId']==id) moved+=n(z['quantity']);
+      for(final z in r) if(z['productId']==id) received+=n(z['quantity']);
+      for(final z in s) if(z['items'] is List) for(final i in z['items'] as List) if(i is Map&&i['productId']==id) sold+=n(i['quantity']);
+      out.add({'productName':x['name']??'Product','quantity':made-moved,'production':made,'transferred':moved,'otherReceived':received,'sold':sold});
+    }
+    return out;
+  }
+
+  Future<List<Map<String,dynamic>>> _cashReport() async {
+    final out=<Map<String,dynamic>>[]; final tx=await coll('transactions'); final sales=await coll('sales'); final salary=await coll('salary'); final exp=await coll('productionExpenses'); final cap=await coll('capital');
+    for(final x in tx) out.add({'date':x['date'],'particular':'${x['type']??''} - ${x['partyName']??x['description']??''}','account':x['paymentAccount']??x['paymentMode']??'Cash','amount':n(x['amount']),'direction':x['type']=='Receipt'?'IN':'OUT'});
+    for(final x in sales) if(n(x['paymentReceived'])>0) out.add({'date':x['date'],'particular':'Sales - ${x['shopName']??''}','account':x['paymentAccount']??'Cash','amount':n(x['paymentReceived']),'direction':'IN'});
+    for(final x in salary) if(n(x['amount'])>0) out.add({'date':x['date'],'particular':'Salary - ${x['workerName']??''}','account':x['paymentAccount']??'Cash','amount':n(x['amount']),'direction':'OUT'});
+    for(final x in exp) if(n(x['amount'])>0) out.add({'date':x['date'],'particular':'Expense - ${x['head']??x['name']??''}','account':x['paymentAccount']??'Cash','amount':n(x['amount']),'direction':'OUT'});
+    for(final x in cap) if(n(x['amount'])>0) out.add({'date':x['date'],'particular':'Capital - ${x['type']??''}','account':x['paymentAccount']??'Cash','amount':n(x['amount']),'direction':x['type']=='received'?'IN':'OUT'});
+    return out;
+  }
+
+  Future<List<Map<String,dynamic>>> _profitLoss() async {
+    final s=await coll('sales'), e=await coll('productionExpenses'), sal=await coll('salary');
+    final gross=s.fold(0.0,(a,x)=>a+n(x['grossAmount'])); final com=s.fold(0.0,(a,x)=>a+n(x['commission'])); final ex=e.fold(0.0,(a,x)=>a+n(x['amount'])); final sa=sal.fold(0.0,(a,x)=>a+n(x['amount']));
+    return [{'particular':'Gross Sales','amount':gross},{'particular':'Commission','amount':com},{'particular':'Expenses','amount':ex},{'particular':'Salary','amount':sa},{'particular':'Profit / Loss','amount':gross-com-ex-sa}];
+  }
+
+  String particular(Map<String,dynamic> x) => (x['shopName']??x['productName']??x['workerName']??x['partyName']??x['particular']??x['type']??x['head']??'').toString();
+  double amount(Map<String,dynamic> x) => n(x['amount']??x['netAmount']??x['grossAmount']??x['Amount']??x['quantity']);
+  double get total => rows.fold(0.0,(a,x)=>a+amount(x));
+
+  Future<void> _pdf() async {
+    if(rows.isEmpty){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('No report data to export.')));return;}
+    await Printing.layoutPdf(onLayout:(format) async { final doc=pw.Document(); doc.addPage(pw.MultiPage(pageFormat:PdfPageFormat.a4,build:(_)=>[
+      pw.Text('DAILY HISAB - $report REPORT',style:pw.TextStyle(fontSize:18,fontWeight:pw.FontWeight.bold)),pw.Text('Period: ${date(from)} to ${date(to)}'),pw.SizedBox(height:12),
+      pw.Table.fromTextArray(headers: const ['Date','Particular','Amount'],data:rows.map((x)=>[date(d(x['date'])),particular(x),amount(x).toStringAsFixed(2)]).toList()),pw.SizedBox(height:10),pw.Align(alignment:pw.Alignment.centerRight,child:pw.Text('Total: Rs. ${total.toStringAsFixed(2)}'))
+    ])); return doc.save(); });
+  }
+
+  @override Widget build(BuildContext context) => Scaffold(appBar:AppBar(title:const Text('Reports'),actions:[IconButton(onPressed:_pdf,icon:const Icon(Icons.picture_as_pdf))]),body:ListView(padding:const EdgeInsets.all(16),children:[
+    DropdownButtonFormField<String>(initialValue:report,decoration:const InputDecoration(labelText:'Report',border:OutlineInputBorder()),items:types.map((x)=>DropdownMenuItem(value:x,child:Text(x))).toList(),onChanged:(v){if(v!=null){setState(()=>report=v);_load();}}),
+    const SizedBox(height:10),DropdownButtonFormField<String>(initialValue:period,decoration:const InputDecoration(labelText:'Period',border:OutlineInputBorder()),items:const ['Daily','Monthly','Quarterly','6 Monthly','Yearly'].map((x)=>DropdownMenuItem(value:x,child:Text(x))).toList(),onChanged:(v){if(v!=null)setPeriod(v);}),
+    if(report=='Sales'||report=='Receipt'||report=='Payments'||report=='Outstanding'||report=='Commission') ...[const SizedBox(height:10),DropdownButtonFormField<String?>(initialValue:shopId,decoration:const InputDecoration(labelText:'Retail Shop',border:OutlineInputBorder()),items:[const DropdownMenuItem(value:null,child:Text('All Retail Shops')),...shops.map((x)=>DropdownMenuItem(value:x['id'].toString(),child:Text(x['name']?.toString()??'')))],onChanged:(v){setState(()=>shopId=v);_load();})],
+    if(report=='Sales'||report=='Outstanding'||report=='Production') ...[const SizedBox(height:10),DropdownButtonFormField<String?>(initialValue:productId,decoration:const InputDecoration(labelText:'Product',border:OutlineInputBorder()),items:[const DropdownMenuItem(value:null,child:Text('All Products')),...products.map((x)=>DropdownMenuItem(value:x['id'].toString(),child:Text(x['name']?.toString()??'')))],onChanged:(v){setState(()=>productId=v);_load();})],
+    const SizedBox(height:14),if(loading)const LinearProgressIndicator(),if(error!=null)Text(error!),if(!loading&&rows.isEmpty)const Padding(padding:EdgeInsets.all(30),child:Text('No data found for selected period.',textAlign:TextAlign.center)),
+    ...rows.map((x)=>Card(child:ListTile(title:Text(particular(x)),subtitle:Text(date(d(x['date']))+((x['account']??'').toString().isEmpty?'':' • ${x['account']}')),trailing:Text(report=='Stock Management'?'${amount(x).toStringAsFixed(2)} Box':money(amount(x)),style:const TextStyle(fontWeight:FontWeight.bold)))),
+    if(rows.isNotEmpty)Padding(padding:const EdgeInsets.all(16),child:Text('TOTAL: ${money(total)}',textAlign:TextAlign.right,style:const TextStyle(fontSize:18,fontWeight:FontWeight.bold)))
+  ]);
+}
