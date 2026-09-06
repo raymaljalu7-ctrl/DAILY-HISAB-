@@ -22,8 +22,8 @@ class _StockManagementPageState extends State<StockManagementPage> {
     transferQty.dispose(); receivedQty.dispose(); receivedSource.dispose(); transferNote.dispose(); super.dispose();
   }
 
-  double _num(dynamic value) => value is num ? value.toDouble() : double.tryParse('$value') ?? 0;
-  void _snack(String text) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  double _num(dynamic v) => v is num ? v.toDouble() : double.tryParse('$v') ?? 0;
+  void _snack(String s) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s)));
 
   Future<void> _saveTransfer(List<Product> products, List<RetailShop> shops) async {
     if (transferProduct == null || transferShop == null) { _snack('Select product and shop.'); return; }
@@ -37,7 +37,7 @@ class _StockManagementPageState extends State<StockManagementPage> {
     });
     transferQty.clear(); transferNote.clear();
     setState(() { transferProduct = null; transferShop = null; });
-    _snack('Stock transfer saved. Production stock decreased and shop stock increased.');
+    _snack('Stock transfer saved.');
   }
 
   Future<void> _saveReceived(List<Product> products, List<RetailShop> shops) async {
@@ -69,12 +69,16 @@ class _StockManagementPageState extends State<StockManagementPage> {
               if (ps.hasError || ss.hasError) return Center(child: Text('Unable to load stock setup.\n${ps.error ?? ss.error}'));
               final products = (ps.data ?? []).map((x) => Product.fromMap(x['id'].toString(), x)).where((x) => x.active).toList();
               final shops = (ss.data ?? []).map((x) => RetailShop.fromMap(x['id'].toString(), x)).where((x) => x.active).toList();
+              Widget content;
+              if (tab == 0) content = _overview(products, shops);
+              else if (tab == 1) content = _transfer(products, shops);
+              else content = _received(products, shops);
               return Column(children: [
                 Padding(padding: const EdgeInsets.all(12), child: SegmentedButton<int>(
                   segments: const [ButtonSegment(value: 0, label: Text('STOCK')), ButtonSegment(value: 1, label: Text('TRANSFER')), ButtonSegment(value: 2, label: Text('OTHER RECEIVED'))],
                   selected: {tab}, onSelectionChanged: (v) => setState(() => tab = v.first),
                 )),
-                Expanded(child: tab == 0 ? _overview(products, shops) : tab == 1 ? _transfer(products, shops) : _received(products, shops)),
+                Expanded(child: content),
               ]);
             },
           );
@@ -102,30 +106,34 @@ class _StockManagementPageState extends State<StockManagementPage> {
                     final received = receivedSnap.data!;
                     final sales = salesSnap.data!;
                     double productionStock(String pid) {
-                      final made = production.where((x) => x['productId'] == pid).fold<double>(0, (s, x) => s + _num(x['quantity']));
-                      final moved = transfers.where((x) => x['productId'] == pid).fold<double>(0, (s, x) => s + _num(x['quantity']));
+                      var made = 0.0;
+                      var moved = 0.0;
+                      for (final x in production) { if (x['productId'] == pid) made += _num(x['quantity']); }
+                      for (final x in transfers) { if (x['productId'] == pid) moved += _num(x['quantity']); }
                       return made - moved;
                     }
                     double shopStock(String sid, String pid) {
-                      final movedIn = transfers.where((x) => x['shopId'] == sid && x['productId'] == pid).fold<double>(0, (s, x) => s + _num(x['quantity']));
-                      final otherIn = received.where((x) => x['shopId'] == sid && x['productId'] == pid).fold<double>(0, (s, x) => s + _num(x['quantity']));
-                      final sold = sales.where((x) => x['shopId'] == sid).fold<double>(0, (s, x) {
-                        final items = (x['items'] as List?) ?? [];
-                        return s + items.whereType<Map>().where((i) => i['productId'] == pid).fold<double>(0, (a, i) => a + _num(i['quantity']));
-                      });
+                      var movedIn = 0.0, otherIn = 0.0, sold = 0.0;
+                      for (final x in transfers) { if (x['shopId'] == sid && x['productId'] == pid) movedIn += _num(x['quantity']); }
+                      for (final x in received) { if (x['shopId'] == sid && x['productId'] == pid) otherIn += _num(x['quantity']); }
+                      for (final x in sales) {
+                        if (x['shopId'] != sid) continue;
+                        final items = x['items'];
+                        if (items is List) {
+                          for (final item in items) { if (item is Map && item['productId'] == pid) sold += _num(item['quantity']); }
+                        }
+                      }
                       return movedIn + otherIn - sold;
                     }
                     return ListView(padding: const EdgeInsets.all(12), children: [
                       const Text('Production Unit Stock', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 8),
-                      ...products.map((p) => Card(child: ListTile(leading: const CircleAvatar(child: Icon(Icons.factory_outlined)), title: Text(p.name), trailing: Text('${productionStock(p.id).toStringAsFixed(2)} Box', style: const TextStyle(fontWeight: FontWeight.bold))))),
+                      for (final p in products) Card(child: ListTile(leading: const CircleAvatar(child: Icon(Icons.factory_outlined)), title: Text(p.name), trailing: Text('${productionStock(p.id).toStringAsFixed(2)} Box', style: const TextStyle(fontWeight: FontWeight.bold)))),
                       const SizedBox(height: 18),
                       const Text('Retail Shop Stock', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 8),
-                      ...shops.map((s) => Card(child: ExpansionTile(title: Text(s.name, style: const TextStyle(fontWeight: FontWeight.bold)), children: products.map((p) => ListTile(title: Text(p.name), trailing: Text('${shopStock(s.id, p.id).toStringAsFixed(2)} Box'))).toList()))),
-                      const SizedBox(height: 20),
-                      const Text('Stock rule: Production adds to Production Unit. Transfers move stock to a shop. Retail sales reduce only that shop. Other Received increases only that shop.', style: TextStyle(fontSize: 13)),
-                    ];
+                      for (final s in shops) Card(child: ExpansionTile(title: Text(s.name, style: const TextStyle(fontWeight: FontWeight.bold)), children: [for (final p in products) ListTile(title: Text(p.name), trailing: Text('${shopStock(s.id, p.id).toStringAsFixed(2)} Box'))])),
+                    ]);
                   },
                 );
               },
@@ -136,25 +144,35 @@ class _StockManagementPageState extends State<StockManagementPage> {
     );
   }
 
-  Widget _transfer(List<Product> products, List<RetailShop> shops) => ListView(padding: const EdgeInsets.all(12), children: [
-    const Text('Production Unit → Retail Shop', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
-    const SizedBox(height: 6), const Text('This moves stock from production to a retail shop.'), const SizedBox(height: 14),
-    DropdownButtonFormField<String>(initialValue: transferProduct, items: products.map((p) => DropdownMenuItem(value: p.id, child: Text(p.name))).toList(), onChanged: (v) => setState(() => transferProduct = v), decoration: const InputDecoration(labelText: 'Product')),
-    const SizedBox(height: 12),
-    DropdownButtonFormField<String>(initialValue: transferShop, items: shops.map((s) => DropdownMenuItem(value: s.id, child: Text(s.name))).toList(), onChanged: (v) => setState(() => transferShop = v), decoration: const InputDecoration(labelText: 'Retail Shop')),
-    const SizedBox(height: 12), TextField(controller: transferQty, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Quantity', suffixText: 'Box')),
-    const SizedBox(height: 12), TextField(controller: transferNote, decoration: const InputDecoration(labelText: 'Note')),
-    const SizedBox(height: 18), SizedBox(height: 50, child: FilledButton.icon(onPressed: () => _saveTransfer(products, shops), icon: const Icon(Icons.local_shipping_outlined), label: const Text('SAVE TRANSFER'))),
-  ]);
+  Widget _transfer(List<Product> products, List<RetailShop> shops) {
+    return ListView(padding: const EdgeInsets.all(12), children: [
+      const Text('Production Unit → Retail Shop', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
+      const SizedBox(height: 14),
+      DropdownButtonFormField<String>(initialValue: transferProduct, items: products.map((p) => DropdownMenuItem(value: p.id, child: Text(p.name))).toList(), onChanged: (v) => setState(() => transferProduct = v), decoration: const InputDecoration(labelText: 'Product')),
+      const SizedBox(height: 12),
+      DropdownButtonFormField<String>(initialValue: transferShop, items: shops.map((s) => DropdownMenuItem(value: s.id, child: Text(s.name))).toList(), onChanged: (v) => setState(() => transferShop = v), decoration: const InputDecoration(labelText: 'Retail Shop')),
+      const SizedBox(height: 12),
+      TextField(controller: transferQty, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Quantity', suffixText: 'Box')),
+      const SizedBox(height: 12),
+      TextField(controller: transferNote, decoration: const InputDecoration(labelText: 'Note')),
+      const SizedBox(height: 18),
+      SizedBox(height: 50, child: FilledButton.icon(onPressed: () => _saveTransfer(products, shops), icon: const Icon(Icons.local_shipping_outlined), label: const Text('SAVE TRANSFER'))),
+    ]);
+  }
 
-  Widget _received(List<Product> products, List<RetailShop> shops) => ListView(padding: const EdgeInsets.all(12), children: [
-    const Text('Retail Shop Other Received', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
-    const SizedBox(height: 6), const Text('Adds stock directly to the selected shop.'), const SizedBox(height: 14),
-    DropdownButtonFormField<String>(initialValue: receivedProduct, items: products.map((p) => DropdownMenuItem(value: p.id, child: Text(p.name))).toList(), onChanged: (v) => setState(() => receivedProduct = v), decoration: const InputDecoration(labelText: 'Product')),
-    const SizedBox(height: 12),
-    DropdownButtonFormField<String>(initialValue: receivedShop, items: shops.map((s) => DropdownMenuItem(value: s.id, child: Text(s.name))).toList(), onChanged: (v) => setState(() => receivedShop = v), decoration: const InputDecoration(labelText: 'Retail Shop')),
-    const SizedBox(height: 12), TextField(controller: receivedQty, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Quantity', suffixText: 'Box')),
-    const SizedBox(height: 12), TextField(controller: receivedSource, decoration: const InputDecoration(labelText: 'Source / Supplier')),
-    const SizedBox(height: 18), SizedBox(height: 50, child: FilledButton.icon(onPressed: () => _saveReceived(products, shops), icon: const Icon(Icons.add_box_outlined), label: const Text('SAVE OTHER RECEIVED'))),
-  ]);
+  Widget _received(List<Product> products, List<RetailShop> shops) {
+    return ListView(padding: const EdgeInsets.all(12), children: [
+      const Text('Retail Shop Other Received', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
+      const SizedBox(height: 14),
+      DropdownButtonFormField<String>(initialValue: receivedProduct, items: products.map((p) => DropdownMenuItem(value: p.id, child: Text(p.name))).toList(), onChanged: (v) => setState(() => receivedProduct = v), decoration: const InputDecoration(labelText: 'Product')),
+      const SizedBox(height: 12),
+      DropdownButtonFormField<String>(initialValue: receivedShop, items: shops.map((s) => DropdownMenuItem(value: s.id, child: Text(s.name))).toList(), onChanged: (v) => setState(() => receivedShop = v), decoration: const InputDecoration(labelText: 'Retail Shop')),
+      const SizedBox(height: 12),
+      TextField(controller: receivedQty, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Quantity', suffixText: 'Box')),
+      const SizedBox(height: 12),
+      TextField(controller: receivedSource, decoration: const InputDecoration(labelText: 'Source / Supplier')),
+      const SizedBox(height: 18),
+      SizedBox(height: 50, child: FilledButton.icon(onPressed: () => _saveReceived(products, shops), icon: const Icon(Icons.add_box_outlined), label: const Text('SAVE OTHER RECEIVED'))),
+    ]);
+  }
 }
