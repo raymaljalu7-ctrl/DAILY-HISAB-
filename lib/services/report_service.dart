@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ReportService {
   ReportService._();
@@ -14,6 +15,18 @@ class ReportService {
         .collection('sharedData')
         .doc('dailyHisab')
         .collection(name);
+  }
+
+  Future<String?> _assignedRetailShopId() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return null;
+
+    final profile = await _db.collection('users').doc(uid).get();
+    final data = profile.data() ?? <String, dynamic>{};
+    if (data['role']?.toString() != 'retail_shop_user') return null;
+
+    final shopId = data['shopId']?.toString();
+    return shopId == null || shopId.isEmpty ? null : shopId;
   }
 
   DateTime _date(dynamic value) {
@@ -58,6 +71,8 @@ class ReportService {
     String? shopId,
     String? productId,
   }) async {
+    final assignedShopId = await _assignedRetailShopId();
+    final effectiveShopId = assignedShopId ?? shopId;
     final snapshot = await _collection('sales').get();
 
     final rows = <Map<String, dynamic>>[];
@@ -70,9 +85,9 @@ class ReportService {
         continue;
       }
 
-      if (shopId != null &&
-          shopId.isNotEmpty &&
-          data['shopId']?.toString() != shopId) {
+      if (effectiveShopId != null &&
+          effectiveShopId.isNotEmpty &&
+          data['shopId']?.toString() != effectiveShopId) {
         continue;
       }
 
@@ -106,9 +121,7 @@ class ReportService {
     required DateTime to,
     String? type,
   }) async {
-    final snapshot =
-        await _collection('transactions').get();
-
+    final snapshot = await _collection('transactions').get();
     final rows = <Map<String, dynamic>>[];
 
     for (final doc in snapshot.docs) {
@@ -143,18 +156,14 @@ class ReportService {
     required DateTime to,
     String? productId,
   }) async {
-    final snapshot =
-        await _collection('production').get();
-
+    final snapshot = await _collection('production').get();
     final rows = <Map<String, dynamic>>[];
 
     for (final doc in snapshot.docs) {
       final data = doc.data();
       final date = _date(data['date']);
 
-      if (!_inRange(date, from, to)) {
-        continue;
-      }
+      if (!_inRange(date, from, to)) continue;
 
       if (productId != null &&
           productId.isNotEmpty &&
@@ -162,16 +171,10 @@ class ReportService {
         continue;
       }
 
-      rows.add({
-        'id': doc.id,
-        ...data,
-      });
+      rows.add({'id': doc.id, ...data});
     }
 
-    rows.sort(
-      (a, b) => _date(b['date']).compareTo(_date(a['date'])),
-    );
-
+    rows.sort((a, b) => _date(b['date']).compareTo(_date(a['date'])));
     return rows;
   }
 
@@ -180,18 +183,14 @@ class ReportService {
     required DateTime to,
     String? head,
   }) async {
-    final snapshot =
-        await _collection('productionExpenses').get();
-
+    final snapshot = await _collection('productionExpenses').get();
     final rows = <Map<String, dynamic>>[];
 
     for (final doc in snapshot.docs) {
       final data = doc.data();
       final date = _date(data['date']);
 
-      if (!_inRange(date, from, to)) {
-        continue;
-      }
+      if (!_inRange(date, from, to)) continue;
 
       if (head != null &&
           head.isNotEmpty &&
@@ -199,16 +198,10 @@ class ReportService {
         continue;
       }
 
-      rows.add({
-        'id': doc.id,
-        ...data,
-      });
+      rows.add({'id': doc.id, ...data});
     }
 
-    rows.sort(
-      (a, b) => _date(b['date']).compareTo(_date(a['date'])),
-    );
-
+    rows.sort((a, b) => _date(b['date']).compareTo(_date(a['date'])));
     return rows;
   }
 
@@ -217,18 +210,14 @@ class ReportService {
     required DateTime to,
     String? workerId,
   }) async {
-    final snapshot =
-        await _collection('salary').get();
-
+    final snapshot = await _collection('salary').get();
     final rows = <Map<String, dynamic>>[];
 
     for (final doc in snapshot.docs) {
       final data = doc.data();
       final date = _date(data['date']);
 
-      if (!_inRange(date, from, to)) {
-        continue;
-      }
+      if (!_inRange(date, from, to)) continue;
 
       if (workerId != null &&
           workerId.isNotEmpty &&
@@ -236,16 +225,10 @@ class ReportService {
         continue;
       }
 
-      rows.add({
-        'id': doc.id,
-        ...data,
-      });
+      rows.add({'id': doc.id, ...data});
     }
 
-    rows.sort(
-      (a, b) => _date(b['date']).compareTo(_date(a['date'])),
-    );
-
+    rows.sort((a, b) => _date(b['date']).compareTo(_date(a['date'])));
     return rows;
   }
 
@@ -253,29 +236,19 @@ class ReportService {
     required DateTime from,
     required DateTime to,
   }) async {
-    final snapshot =
-        await _collection('capital').get();
-
+    final snapshot = await _collection('capital').get();
     final rows = <Map<String, dynamic>>[];
 
     for (final doc in snapshot.docs) {
       final data = doc.data();
       final date = _date(data['date']);
 
-      if (!_inRange(date, from, to)) {
-        continue;
-      }
+      if (!_inRange(date, from, to)) continue;
 
-      rows.add({
-        'id': doc.id,
-        ...data,
-      });
+      rows.add({'id': doc.id, ...data});
     }
 
-    rows.sort(
-      (a, b) => _date(b['date']).compareTo(_date(a['date'])),
-    );
-
+    rows.sort((a, b) => _date(b['date']).compareTo(_date(a['date'])));
     return rows;
   }
 
@@ -284,35 +257,27 @@ class ReportService {
     required DateTime to,
     String? shopId,
   }) async {
-    final snapshot =
-        await _collection('commissions').get();
-
+    final assignedShopId = await _assignedRetailShopId();
+    final effectiveShopId = assignedShopId ?? shopId;
+    final snapshot = await _collection('commissions').get();
     final rows = <Map<String, dynamic>>[];
 
     for (final doc in snapshot.docs) {
       final data = doc.data();
       final date = _date(data['date']);
 
-      if (!_inRange(date, from, to)) {
+      if (!_inRange(date, from, to)) continue;
+
+      if (effectiveShopId != null &&
+          effectiveShopId.isNotEmpty &&
+          data['shopId']?.toString() != effectiveShopId) {
         continue;
       }
 
-      if (shopId != null &&
-          shopId.isNotEmpty &&
-          data['shopId']?.toString() != shopId) {
-        continue;
-      }
-
-      rows.add({
-        'id': doc.id,
-        ...data,
-      });
+      rows.add({'id': doc.id, ...data});
     }
 
-    rows.sort(
-      (a, b) => _date(b['date']).compareTo(_date(a['date'])),
-    );
-
+    rows.sort((a, b) => _date(b['date']).compareTo(_date(a['date'])));
     return rows;
   }
 }
