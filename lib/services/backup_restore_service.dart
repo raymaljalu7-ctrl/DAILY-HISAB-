@@ -19,19 +19,11 @@ class BackupRestoreService {
   CollectionReference<Map<String,dynamic>> _collection(String name) => _db.collection(_rootCollection).doc(_rootDocument).collection(name);
 
   Future<Map<String,dynamic>> createBackup() async {
-    final backup = <String,dynamic>{
-      'backupVersion':2,
-      'app':'Daily Hisab',
-      'createdAt':DateTime.now().toUtc().toIso8601String(),
-      'collections':<String,dynamic>{},
-    };
+    final backup = <String,dynamic>{'backupVersion':2,'app':'Daily Hisab','createdAt':DateTime.now().toUtc().toIso8601String(),'collections':<String,dynamic>{}};
     final collections = backup['collections'] as Map<String,dynamic>;
     for (final name in businessCollections) {
       final snapshot = await _collection(name).get();
-      collections[name] = snapshot.docs.map((doc)=>{
-        'id':doc.id,
-        'data':_encodeValue(doc.data()),
-      }).toList();
+      collections[name] = snapshot.docs.map((doc)=>{'id':doc.id,'data':_encodeValue(doc.data())}).toList();
     }
     return backup;
   }
@@ -44,35 +36,26 @@ class BackupRestoreService {
     return 'Daily_Hisab_Backup_${now.year}-${two(now.month)}-${two(now.day)}_${two(now.hour)}-${two(now.minute)}-${two(now.second)}.json';
   }
 
-  /// Opens the device save dialog so the user chooses exactly where the backup file is stored.
   Future<String?> saveBackup() async {
     final json = await createBackupJson();
     final bytes = Uint8List.fromList(utf8.encode(json));
-    final path = await FilePicker.platform.saveFile(
+    return FilePicker.platform.saveFile(
       dialogTitle: 'Save Daily Hisab Backup',
       fileName: _fileName(),
       type: FileType.custom,
       allowedExtensions: ['json'],
       bytes: bytes,
     );
-    if (path == null || path.isEmpty) return null;
-    // Some platforms return a path without writing the supplied bytes.
-    final file = File(path);
-    if (!await file.exists() || await file.length() == 0) {
-      await file.writeAsBytes(bytes, flush: true);
-    }
-    return path;
   }
 
-  /// Shares the actual JSON backup file, rather than putting raw JSON text in the share message.
+  /// Kept for compatibility with the existing Admin button. It now saves the real JSON file using the device save dialog.
   Future<void> shareBackup() async {
-    final json = await createBackupJson();
-    final bytes = Uint8List.fromList(utf8.encode(json));
-    final tempPath = '${Directory.systemTemp.path}${Platform.pathSeparator}${_fileName()}';
-    final file = File(tempPath);
-    await file.writeAsBytes(bytes, flush: true);
+    await saveBackup();
+  }
+
+  Future<void> shareSavedBackup(String path) async {
     await SharePlus.instance.share(ShareParams(
-      files: [XFile(file.path, mimeType: 'application/json')],
+      files: [XFile(path, mimeType: 'application/json')],
       subject: 'Daily Hisab Backup',
       text: 'Daily Hisab backup file',
     ));
