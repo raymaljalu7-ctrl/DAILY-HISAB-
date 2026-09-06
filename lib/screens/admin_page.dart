@@ -74,8 +74,8 @@ class _AdminPageState extends State<AdminPage> {
                 final cred = await auth.createUserWithEmailAndPassword(email: e, password: password.text);
                 await db.collection('users').doc(cred.user!.uid).set({
                   'email': e, 'role': role, 'status': 'pending',
-                  if (shopId != null) 'shopId': shopId,
-                  if (shopName != null) 'shopName': shopName,
+                  if (shopId != null) ...{'shopId': shopId},
+                  if (shopName != null) ...{'shopName': shopName},
                   'createdAt': FieldValue.serverTimestamp(),
                 });
                 await app.delete();
