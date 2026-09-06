@@ -7,6 +7,9 @@ service cloud.firestore {
     function myProfile() { return get(/databases/$(database)/documents/users/$(myUid())).data; }
     function isApproved() { return signedIn() && myProfile().status == 'approved'; }
     function isAdmin() { return isApproved() && myProfile().role == 'admin'; }
+    function isRetailUser() { return isApproved() && myProfile().role == 'retail_shop_user'; }
+    function ownShop() { return resource.data.shopId == myProfile().shopId; }
+    function newOwnShop() { return request.resource.data.shopId == myProfile().shopId; }
 
     match /users/{uid} {
       allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
@@ -17,45 +20,33 @@ service cloud.firestore {
     }
 
     match /sharedData/dailyHisab/{document=**} {
-      allow read: if isApproved();
+      allow read: if isApproved() && (isAdmin() || !isRetailUser() || resource.data.shopId == myProfile().shopId || resource.data.retailShopId == myProfile().shopId);
       allow create: if isApproved()
         && request.resource.data.createdBy == request.auth.uid
-        && request.resource.data.deletionRequested == false;
-
-      // Admin can edit any record. Non-admin users cannot directly edit
-      // business data; they may only mark their own record for deletion.
+        && request.resource.data.deletionRequested == false
+        && (!isRetailUser() || newOwnShop());
       allow update: if isAdmin()
-        || (
-          isApproved()
+        || (isApproved() && !isRetailUser()
           && resource.data.deletionRequested != true
           && request.resource.data.deletionRequested == true
           && request.resource.data.deletionRequestedBy == request.auth.uid
           && request.resource.data.deletionRequestedByEmail == request.auth.token.email
           && request.resource.data.createdBy == resource.data.createdBy
           && request.resource.data.createdByEmail == resource.data.createdByEmail
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'deletionRequested',
-            'deletionRequestedBy',
-            'deletionRequestedByEmail',
-            'updatedAt'
-          ])
-        );
-
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletionRequested','deletionRequestedBy','deletionRequestedByEmail','updatedAt']))
+        || (isRetailUser() && resource.data.shopId == myProfile().shopId
+          && request.resource.data.shopId == myProfile().shopId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletionRequested','deletionRequestedBy','deletionRequestedByEmail','updatedAt']));
       allow delete: if isAdmin();
     }
 
     match /deletionRequests/{requestId} {
-      allow create: if isApproved()
-        && request.resource.data.requestedBy == request.auth.uid
-        && request.resource.data.status == 'pending';
+      allow create: if isApproved() && request.resource.data.requestedBy == request.auth.uid && request.resource.data.status == 'pending';
       allow read, update, delete: if isAdmin();
     }
 
     match /changeRequests/{requestId} {
-      allow create: if isApproved()
-        && request.resource.data.requestedBy == request.auth.uid
-        && request.resource.data.status == 'pending'
-        && request.resource.data.action in ['edit', 'delete'];
+      allow create: if isApproved() && request.resource.data.requestedBy == request.auth.uid && request.resource.data.status == 'pending' && request.resource.data.action in ['edit', 'delete'];
       allow read, update, delete: if isAdmin();
     }
   }
