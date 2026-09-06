@@ -73,9 +73,11 @@ class _AdminPageState extends State<AdminPage> {
                 final auth = FirebaseAuth.instanceFor(app: app);
                 final cred = await auth.createUserWithEmailAndPassword(email: e, password: password.text);
                 await db.collection('users').doc(cred.user!.uid).set({
-                  'email': e, 'role': role, 'status': 'pending',
-                  if (shopId != null) ...{'shopId': shopId},
-                  if (shopName != null) ...{'shopName': shopName},
+                  'email': e,
+                  'role': role,
+                  'status': 'pending',
+                  'shopId': shopId,
+                  'shopName': shopName,
                   'createdAt': FieldValue.serverTimestamp(),
                 });
                 await app.delete();
