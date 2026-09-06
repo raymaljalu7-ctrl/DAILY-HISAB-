@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 class RetailStockPage extends StatelessWidget {
   const RetailStockPage({super.key});
 
-  CollectionReference<Map<String, dynamic>> _db() => FirebaseFirestore.instance.collection('sharedData').doc('dailyHisab');
+  DocumentReference<Map<String, dynamic>> _db() => FirebaseFirestore.instance.collection('sharedData').doc('dailyHisab');
 
   @override
   Widget build(BuildContext context) {
