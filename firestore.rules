@@ -21,14 +21,10 @@ service cloud.firestore {
       allow create: if isApproved()
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.deletionRequested == false;
+
+      // Admin can edit any record. Non-admin users cannot directly edit
+      // business data; they may only mark their own record for deletion.
       allow update: if isAdmin()
-        || (
-          isApproved()
-          && resource.data.createdBy == request.auth.uid
-          && request.resource.data.createdBy == resource.data.createdBy
-          && request.resource.data.createdByEmail == resource.data.createdByEmail
-          && request.resource.data.deletionRequested == resource.data.deletionRequested
-        )
         || (
           isApproved()
           && resource.data.deletionRequested != true
@@ -37,7 +33,14 @@ service cloud.firestore {
           && request.resource.data.deletionRequestedByEmail == request.auth.token.email
           && request.resource.data.createdBy == resource.data.createdBy
           && request.resource.data.createdByEmail == resource.data.createdByEmail
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'deletionRequested',
+            'deletionRequestedBy',
+            'deletionRequestedByEmail',
+            'updatedAt'
+          ])
         );
+
       allow delete: if isAdmin();
     }
 
