@@ -2,18 +2,17 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
 import 'firebase_options.dart';
+import 'screens/admin_page.dart';
 import 'screens/business_page.dart';
-import 'screens/dashboard_page.dart' as v2_dashboard;
-import 'screens/transactions_page.dart' as v2_transactions;
-import 'screens/reports_page.dart' as v2_reports;
 import 'screens/cash_management_page.dart';
-import 'services/backup_restore_service.dart';
+import 'screens/dashboard_page.dart' as v2_dashboard;
+import 'screens/login_page.dart';
 import 'screens/masters_page.dart';
+import 'screens/reports_page.dart' as v2_reports;
+import 'screens/sales_page.dart';
+import 'screens/stock_management_page.dart';
+import 'screens/transactions_page.dart' as v2_transactions;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
