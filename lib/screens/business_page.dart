@@ -13,7 +13,7 @@ import 'transaction_history_page.dart';
 class BusinessPage extends StatelessWidget {
   const BusinessPage({super.key});
   @override Widget build(BuildContext context) {
-    final items=< _BusinessItem>[
+    final items=<_BusinessItem>[
       _BusinessItem('Sales','Record retail shop sales and commission',Icons.point_of_sale_outlined,const SalesFixedPage()),
       _BusinessItem('Production','Record daily bakery production',Icons.factory_outlined,const ProductionFixedPage()),
       _BusinessItem('Stock Management','Production stock, transfers and shop stock',Icons.inventory_outlined,const StockManagementPage()),
