@@ -6,16 +6,14 @@ service cloud.firestore {
     function myUid() { return request.auth.uid; }
     function myProfile() { return get(/databases/$(database)/documents/users/$(myUid())).data; }
     function isApproved() { return signedIn() && myProfile().status == 'approved'; }
-    function isAdmin() { return isApproved() && myProfile().role == 'admin'; }
+    function isAdmin() { return signedIn() && myProfile().status == 'approved' && myProfile().role == 'admin'; }
     function isRetailUser() { return isApproved() && myProfile().role == 'retail_shop_user'; }
     function ownShop() { return resource.data.shopId == myProfile().shopId; }
     function newOwnShop() { return request.resource.data.shopId == myProfile().shopId; }
 
     match /users/{uid} {
       allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
-      allow create: if signedIn() && request.auth.uid == uid
-        && request.resource.data.role == 'user'
-        && request.resource.data.status == 'pending';
+      allow create: if signedIn() && request.auth.uid == uid && request.resource.data.role == 'user' && request.resource.data.status == 'pending';
       allow update, delete: if isAdmin();
     }
 
@@ -23,30 +21,16 @@ service cloud.firestore {
       allow read: if isApproved();
       allow create, update, delete: if isAdmin();
     }
-
     match /sharedData/dailyHisab/retailShops/{shopId} {
       allow read: if isApproved() && (isAdmin() || !isRetailUser() || shopId == myProfile().shopId);
       allow create, update, delete: if isAdmin();
     }
-
     match /sharedData/dailyHisab/{document=**} {
       allow read: if isApproved() && (isAdmin() || !isRetailUser() || resource.data.shopId == myProfile().shopId || resource.data.retailShopId == myProfile().shopId);
-      allow create: if isApproved()
-        && request.resource.data.createdBy == request.auth.uid
-        && request.resource.data.deletionRequested == false
-        && (!isRetailUser() || newOwnShop());
+      allow create: if isApproved() && request.resource.data.createdBy == request.auth.uid && request.resource.data.deletionRequested == false && (!isRetailUser() || newOwnShop());
       allow update: if isAdmin()
-        || (isApproved() && !isRetailUser()
-          && resource.data.deletionRequested != true
-          && request.resource.data.deletionRequested == true
-          && request.resource.data.deletionRequestedBy == request.auth.uid
-          && request.resource.data.deletionRequestedByEmail == request.auth.token.email
-          && request.resource.data.createdBy == resource.data.createdBy
-          && request.resource.data.createdByEmail == resource.data.createdByEmail
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletionRequested','deletionRequestedBy','deletionRequestedByEmail','updatedAt']))
-        || (isRetailUser() && resource.data.shopId == myProfile().shopId
-          && request.resource.data.shopId == myProfile().shopId
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletionRequested','deletionRequestedBy','deletionRequestedByEmail','updatedAt']));
+        || (isApproved() && !isRetailUser() && resource.data.deletionRequested != true && request.resource.data.deletionRequested == true && request.resource.data.deletionRequestedBy == request.auth.uid && request.resource.data.deletionRequestedByEmail == request.auth.token.email && request.resource.data.createdBy == resource.data.createdBy && request.resource.data.createdByEmail == resource.data.createdByEmail && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletionRequested','deletionRequestedBy','deletionRequestedByEmail','updatedAt']))
+        || (isRetailUser() && resource.data.shopId == myProfile().shopId && request.resource.data.shopId == myProfile().shopId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletionRequested','deletionRequestedBy','deletionRequestedByEmail','updatedAt']));
       allow delete: if isAdmin();
     }
 
@@ -57,7 +41,8 @@ service cloud.firestore {
 
     match /changeRequests/{requestId} {
       allow create: if isApproved() && request.resource.data.requestedBy == request.auth.uid && request.resource.data.status == 'pending' && request.resource.data.action in ['edit', 'delete'];
-      allow read, update, delete: if isAdmin();
+      allow get, list: if isAdmin();
+      allow update, delete: if isAdmin();
     }
   }
 }
