@@ -16,24 +16,28 @@ class BackupRestoreService {
     'retailShops','parties','workers','openingBalances',
   ];
 
-  CollectionReference<Map<String,dynamic>> _collection(String name) => _db.collection(_rootCollection).doc(_rootDocument).collection(name);
+  CollectionReference<Map<String, dynamic>> _collection(String name) =>
+      _db.collection(_rootCollection).doc(_rootDocument).collection(name);
 
-  Future<Map<String,dynamic>> createBackup() async {
-    final backup = <String,dynamic>{
+  Future<Map<String, dynamic>> createBackup() async {
+    final backup = <String, dynamic>{
       'backupVersion': 2,
       'app': 'Daily Hisab',
       'createdAt': DateTime.now().toUtc().toIso8601String(),
-      'collections': <String,dynamic>{},
+      'collections': <String, dynamic>{},
     };
-    final collections = backup['collections'] as Map<String,dynamic>;
+    final collections = backup['collections'] as Map<String, dynamic>;
     for (final name in businessCollections) {
       final snapshot = await _collection(name).get();
-      collections[name] = snapshot.docs.map((doc) => {'id': doc.id, 'data': _encodeValue(doc.data())}).toList();
+      collections[name] = snapshot.docs
+          .map((doc) => {'id': doc.id, 'data': _encodeValue(doc.data())})
+          .toList();
     }
     return backup;
   }
 
-  Future<String> createBackupJson() async => const JsonEncoder.withIndent('  ').convert(await createBackup());
+  Future<String> createBackupJson() async =>
+      const JsonEncoder.withIndent('  ').convert(await createBackup());
 
   String _fileName() {
     final now = DateTime.now();
@@ -41,7 +45,7 @@ class BackupRestoreService {
     return 'Daily_Hisab_Backup_${now.year}-${two(now.month)}-${two(now.day)}_${two(now.hour)}-${two(now.minute)}-${two(now.second)}.json';
   }
 
-  Future<String?> saveBackup() async {
+  Future<Uri?> saveBackup() async {
     final json = await createBackupJson();
     return FilePicker.saveFile(
       dialogTitle: 'Save Daily Hisab Backup',
@@ -52,7 +56,9 @@ class BackupRestoreService {
     );
   }
 
-  Future<void> shareBackup() async => saveBackup();
+  Future<void> shareBackup() async {
+    await saveBackup();
+  }
 
   Future<void> shareSavedBackup(String path) async {
     await SharePlus.instance.share(ShareParams(
@@ -63,15 +69,25 @@ class BackupRestoreService {
   }
 
   Future<int> restoreFromFile() async {
-    final result = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: ['json'], withData: true);
-    if (result == null || result.files.isEmpty) return 0;
-    final file = result.files.single;
+    final files = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['json'],
+      withData: true,
+    );
+    if (files.isEmpty) return 0;
+    final file = files.first;
     final bytes = file.bytes;
-    if (bytes == null) throw Exception('Unable to read the selected backup file.');
+    if (bytes == null) {
+      throw Exception('Unable to read the selected backup file.');
+    }
     final decoded = jsonDecode(utf8.decode(bytes));
-    if (decoded is! Map<String,dynamic> || decoded['app'] != 'Daily Hisab') throw Exception('Invalid Daily Hisab backup file.');
+    if (decoded is! Map<String, dynamic> || decoded['app'] != 'Daily Hisab') {
+      throw Exception('Invalid Daily Hisab backup file.');
+    }
     final collections = decoded['collections'];
-    if (collections is! Map<String,dynamic>) throw Exception('Backup file contains no business data.');
+    if (collections is! Map<String, dynamic>) {
+      throw Exception('Backup file contains no business data.');
+    }
     int count = 0;
     for (final name in businessCollections) {
       final records = collections[name];
@@ -81,7 +97,9 @@ class BackupRestoreService {
         final id = record['id']?.toString();
         final raw = record['data'];
         if (id == null || raw is! Map) continue;
-        await _collection(name).doc(id).set(_decodeMap(Map<String,dynamic>.from(raw)));
+        await _collection(name).doc(id).set(
+          _decodeMap(Map<String, dynamic>.from(raw)),
+        );
         count++;
       }
     }
@@ -89,25 +107,46 @@ class BackupRestoreService {
   }
 
   dynamic _encodeValue(dynamic value) {
-    if (value is Timestamp) return {'__type':'timestamp','value':value.toDate().toUtc().toIso8601String()};
-    if (value is DateTime) return {'__type':'datetime','value':value.toUtc().toIso8601String()};
-    if (value is GeoPoint) return {'__type':'geopoint','latitude':value.latitude,'longitude':value.longitude};
-    if (value is DocumentReference) return {'__type':'documentReference','path':value.path};
-    if (value is Map) return value.map((k,v)=>MapEntry(k.toString(),_encodeValue(v)));
+    if (value is Timestamp) {
+      return {'__type': 'timestamp', 'value': value.toDate().toUtc().toIso8601String()};
+    }
+    if (value is DateTime) {
+      return {'__type': 'datetime', 'value': value.toUtc().toIso8601String()};
+    }
+    if (value is GeoPoint) {
+      return {'__type': 'geopoint', 'latitude': value.latitude, 'longitude': value.longitude};
+    }
+    if (value is DocumentReference) {
+      return {'__type': 'documentReference', 'path': value.path};
+    }
+    if (value is Map) {
+      return value.map((k, v) => MapEntry(k.toString(), _encodeValue(v)));
+    }
     if (value is List) return value.map(_encodeValue).toList();
-    if (value is Uint8List) return {'__type':'bytes','value':base64Encode(value)};
+    if (value is Uint8List) {
+      return {'__type': 'bytes', 'value': base64Encode(value)};
+    }
     return value;
   }
 
-  Map<String,dynamic> _decodeMap(Map<String,dynamic> map) => map.map((k,v)=>MapEntry(k,_decodeValue(v)));
+  Map<String, dynamic> _decodeMap(Map<String, dynamic> map) =>
+      map.map((k, v) => MapEntry(k, _decodeValue(v)));
+
   dynamic _decodeValue(dynamic value) {
     if (value is Map) {
-      final type=value['__type'];
-      if (type=='timestamp'||type=='datetime') return Timestamp.fromDate(DateTime.parse(value['value'].toString()).toUtc());
-      if (type=='geopoint') return GeoPoint((value['latitude'] as num).toDouble(),(value['longitude'] as num).toDouble());
-      if (type=='documentReference') return _db.doc(value['path'].toString());
-      if (type=='bytes') return base64Decode(value['value'].toString());
-      return value.map((k,v)=>MapEntry(k.toString(),_decodeValue(v)));
+      final type = value['__type'];
+      if (type == 'timestamp' || type == 'datetime') {
+        return Timestamp.fromDate(DateTime.parse(value['value'].toString()).toUtc());
+      }
+      if (type == 'geopoint') {
+        return GeoPoint(
+          (value['latitude'] as num).toDouble(),
+          (value['longitude'] as num).toDouble(),
+        );
+      }
+      if (type == 'documentReference') return _db.doc(value['path'].toString());
+      if (type == 'bytes') return base64Decode(value['value'].toString());
+      return value.map((k, v) => MapEntry(k.toString(), _decodeValue(v)));
     }
     if (value is List) return value.map(_decodeValue).toList();
     return value;
