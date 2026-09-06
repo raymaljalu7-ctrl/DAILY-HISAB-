@@ -19,6 +19,16 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    match /sharedData/dailyHisab/products/{productId} {
+      allow read: if isApproved();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /sharedData/dailyHisab/retailShops/{shopId} {
+      allow read: if isApproved() && (isAdmin() || !isRetailUser() || shopId == myProfile().shopId);
+      allow create, update, delete: if isAdmin();
+    }
+
     match /sharedData/dailyHisab/{document=**} {
       allow read: if isApproved() && (isAdmin() || !isRetailUser() || resource.data.shopId == myProfile().shopId || resource.data.retailShopId == myProfile().shopId);
       allow create: if isApproved()
