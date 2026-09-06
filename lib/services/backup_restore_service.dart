@@ -72,12 +72,10 @@ class BackupRestoreService {
     final files = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['json'],
-      withData: true,
     );
     if (files.isEmpty) return 0;
-    final file = files.first;
-    final bytes = file.bytes;
-    if (bytes == null) {
+    final bytes = await files.first.readAsBytes();
+    if (bytes.isEmpty) {
       throw Exception('Unable to read the selected backup file.');
     }
     final decoded = jsonDecode(utf8.decode(bytes));
