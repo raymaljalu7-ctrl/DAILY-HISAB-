@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/sales.dart';
 import 'firestore_service.dart';
 
@@ -15,6 +16,22 @@ class SalesService {
   Future<String> addSale(Sale sale) => FirestoreService.instance.add('sales', sale.toMap());
   Future<void> updateSale(Sale sale) => FirestoreService.instance.update('sales', sale.id, sale.toMap());
   Future<void> deleteSale(String id) => FirestoreService.instance.delete('sales', id);
-  Stream<List<Sale>> watchSales() => _sales.snapshots().map((s) { final x = s.docs.map((d) => Sale.fromMap(d.id, d.data())).toList(); x.sort((a,b)=>b.date.compareTo(a.date)); return x; });
+
+  Stream<List<Sale>> watchSales() {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return const Stream.empty();
+    return Stream.fromFuture(_db.collection('users').doc(uid).get()).asyncExpand((profile) {
+      final data = profile.data() ?? {};
+      if (data['role'] == 'retail_shop_user' && data['shopId'] != null) {
+        return watchShopSales(data['shopId'].toString());
+      }
+      return _sales.snapshots().map((s) {
+        final x = s.docs.map((d) => Sale.fromMap(d.id, d.data())).toList();
+        x.sort((a,b)=>b.date.compareTo(a.date));
+        return x;
+      });
+    });
+  }
+
   Stream<List<Sale>> watchShopSales(String shopId) => _sales.where('shopId', isEqualTo: shopId).snapshots().map((s) { final x=s.docs.map((d)=>Sale.fromMap(d.id,d.data())).toList(); x.sort((a,b)=>b.date.compareTo(a.date)); return x; });
 }
