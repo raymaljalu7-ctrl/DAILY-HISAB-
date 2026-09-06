@@ -1,0 +1,318 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+class ReportService {
+  ReportService._();
+
+  static final ReportService instance = ReportService._();
+
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
+
+  CollectionReference<Map<String, dynamic>> _collection(
+    String name,
+  ) {
+    return _db
+        .collection('sharedData')
+        .doc('dailyHisab')
+        .collection(name);
+  }
+
+  DateTime _date(dynamic value) {
+    if (value is Timestamp) {
+      return value.toDate();
+    }
+
+    if (value is DateTime) {
+      return value;
+    }
+
+    return DateTime.fromMillisecondsSinceEpoch(0);
+  }
+
+  bool _inRange(
+    DateTime date,
+    DateTime from,
+    DateTime to,
+  ) {
+    final start = DateTime(
+      from.year,
+      from.month,
+      from.day,
+    );
+
+    final end = DateTime(
+      to.year,
+      to.month,
+      to.day,
+      23,
+      59,
+      59,
+      999,
+    );
+
+    return !date.isBefore(start) && !date.isAfter(end);
+  }
+
+  Future<List<Map<String, dynamic>>> sales({
+    required DateTime from,
+    required DateTime to,
+    String? shopId,
+    String? productId,
+  }) async {
+    final snapshot = await _collection('sales').get();
+
+    final rows = <Map<String, dynamic>>[];
+
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+      final date = _date(data['date']);
+
+      if (!_inRange(date, from, to)) {
+        continue;
+      }
+
+      if (shopId != null &&
+          shopId.isNotEmpty &&
+          data['shopId']?.toString() != shopId) {
+        continue;
+      }
+
+      if (productId != null && productId.isNotEmpty) {
+        final rawItems = data['items'] as List<dynamic>? ?? [];
+        final hasProduct = rawItems.any((item) {
+          if (item is! Map) return false;
+          return item['productId']?.toString() == productId;
+        });
+
+        if (!hasProduct) {
+          continue;
+        }
+      }
+
+      rows.add({
+        'id': doc.id,
+        ...data,
+      });
+    }
+
+    rows.sort(
+      (a, b) => _date(b['date']).compareTo(_date(a['date'])),
+    );
+
+    return rows;
+  }
+
+  Future<List<Map<String, dynamic>>> transactions({
+    required DateTime from,
+    required DateTime to,
+    String? type,
+  }) async {
+    final snapshot =
+        await _collection('transactions').get();
+
+    final rows = <Map<String, dynamic>>[];
+
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+      final date = _date(data['date']);
+
+      if (!_inRange(date, from, to)) {
+        continue;
+      }
+
+      if (type != null &&
+          type.isNotEmpty &&
+          data['type']?.toString() != type) {
+        continue;
+      }
+
+      rows.add({
+        'id': doc.id,
+        ...data,
+      });
+    }
+
+    rows.sort(
+      (a, b) => _date(b['date']).compareTo(_date(a['date'])),
+    );
+
+    return rows;
+  }
+
+  Future<List<Map<String, dynamic>>> production({
+    required DateTime from,
+    required DateTime to,
+    String? productId,
+  }) async {
+    final snapshot =
+        await _collection('production').get();
+
+    final rows = <Map<String, dynamic>>[];
+
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+      final date = _date(data['date']);
+
+      if (!_inRange(date, from, to)) {
+        continue;
+      }
+
+      if (productId != null &&
+          productId.isNotEmpty &&
+          data['productId']?.toString() != productId) {
+        continue;
+      }
+
+      rows.add({
+        'id': doc.id,
+        ...data,
+      });
+    }
+
+    rows.sort(
+      (a, b) => _date(b['date']).compareTo(_date(a['date'])),
+    );
+
+    return rows;
+  }
+
+  Future<List<Map<String, dynamic>>> expenses({
+    required DateTime from,
+    required DateTime to,
+    String? head,
+  }) async {
+    final snapshot =
+        await _collection('productionExpenses').get();
+
+    final rows = <Map<String, dynamic>>[];
+
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+      final date = _date(data['date']);
+
+      if (!_inRange(date, from, to)) {
+        continue;
+      }
+
+      if (head != null &&
+          head.isNotEmpty &&
+          (data['head'] ?? data['name']).toString() != head) {
+        continue;
+      }
+
+      rows.add({
+        'id': doc.id,
+        ...data,
+      });
+    }
+
+    rows.sort(
+      (a, b) => _date(b['date']).compareTo(_date(a['date'])),
+    );
+
+    return rows;
+  }
+
+  Future<List<Map<String, dynamic>>> salary({
+    required DateTime from,
+    required DateTime to,
+    String? workerId,
+  }) async {
+    final snapshot =
+        await _collection('salary').get();
+
+    final rows = <Map<String, dynamic>>[];
+
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+      final date = _date(data['date']);
+
+      if (!_inRange(date, from, to)) {
+        continue;
+      }
+
+      if (workerId != null &&
+          workerId.isNotEmpty &&
+          data['workerId']?.toString() != workerId) {
+        continue;
+      }
+
+      rows.add({
+        'id': doc.id,
+        ...data,
+      });
+    }
+
+    rows.sort(
+      (a, b) => _date(b['date']).compareTo(_date(a['date'])),
+    );
+
+    return rows;
+  }
+
+  Future<List<Map<String, dynamic>>> capital({
+    required DateTime from,
+    required DateTime to,
+  }) async {
+    final snapshot =
+        await _collection('capital').get();
+
+    final rows = <Map<String, dynamic>>[];
+
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+      final date = _date(data['date']);
+
+      if (!_inRange(date, from, to)) {
+        continue;
+      }
+
+      rows.add({
+        'id': doc.id,
+        ...data,
+      });
+    }
+
+    rows.sort(
+      (a, b) => _date(b['date']).compareTo(_date(a['date'])),
+    );
+
+    return rows;
+  }
+
+  Future<List<Map<String, dynamic>>> commissions({
+    required DateTime from,
+    required DateTime to,
+    String? shopId,
+  }) async {
+    final snapshot =
+        await _collection('commissions').get();
+
+    final rows = <Map<String, dynamic>>[];
+
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+      final date = _date(data['date']);
+
+      if (!_inRange(date, from, to)) {
+        continue;
+      }
+
+      if (shopId != null &&
+          shopId.isNotEmpty &&
+          data['shopId']?.toString() != shopId) {
+        continue;
+      }
+
+      rows.add({
+        'id': doc.id,
+        ...data,
+      });
+    }
+
+    rows.sort(
+      (a, b) => _date(b['date']).compareTo(_date(a['date'])),
+    );
+
+    return rows;
+  }
+}

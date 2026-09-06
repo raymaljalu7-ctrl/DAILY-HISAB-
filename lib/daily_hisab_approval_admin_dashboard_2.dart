@@ -7,17 +7,10 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'firebase_options.dart';
-import 'screens/business_page.dart';
-import 'screens/dashboard_page.dart' as v2_dashboard;
-import 'screens/transactions_page.dart' as v2_transactions;
-import 'screens/reports_page.dart' as v2_reports;
-import 'services/backup_restore_service.dart';
-import 'screens/masters_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  await FirebaseAuth.instance.signOut();
   runApp(const DailyHisabApp());
 }
 
@@ -123,121 +116,8 @@ class AuthGate extends StatelessWidget {
             if (status != 'approved') {
               return AccountPendingPage(message: status == 'disabled' ? 'Your account has been disabled by Admin.' : 'Your account is waiting for Admin approval.');
             }
-            return const WelcomePage();
+            return const HomePage();
           },
-        );
-      },
-    );
-  }
-}
-
-
-class WelcomePage extends StatelessWidget {
-  const WelcomePage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.account_balance_wallet_outlined,
-                  size: 80,
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  'Welcome to Daily Hisab',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 30,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  'Manage your business, sales, production and accounts in one place.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 16,
-                  ),
-                ),
-                const SizedBox(height: 32),
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: FilledButton.icon(
-                    onPressed: () {
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(
-                          builder: (_) => const AppShell(),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.arrow_forward),
-                    label: const Text(
-                      'ENTER DAILY HISAB',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class AppShell extends StatefulWidget { const AppShell({super.key}); @override State<AppShell> createState() => _AppShellState(); }
-
-class _AppShellState extends State<AppShell> {
-  int index = 0;
-
-  @override
-  Widget build(BuildContext context) {
-    final uid = FirebaseAuth.instance.currentUser!.uid;
-
-    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
-      builder: (context, snap) {
-        final profile = snap.data?.data() ?? {};
-        final isAdmin = profile['role'] == 'admin';
-
-        final pages = <Widget>[
-          const v2_dashboard.DashboardPage(),
-          const v2_transactions.TransactionsPage(),
-          const BusinessPage(),
-          const MastersPage(),
-          const v2_reports.ReportsPage(),
-          if (isAdmin) const AdminPage(),
-        ];
-
-        final destinations = <NavigationDestination>[
-          const NavigationDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard), label: 'Dashboard'),
-          const NavigationDestination(icon: Icon(Icons.swap_horiz), label: 'Transactions'),
-          const NavigationDestination(icon: Icon(Icons.business_center_outlined), label: 'Business'),
-          const NavigationDestination(icon: Icon(Icons.settings_outlined), label: 'Masters'),
-          const NavigationDestination(icon: Icon(Icons.assessment_outlined), label: 'Reports'),
-          if (isAdmin) const NavigationDestination(icon: Icon(Icons.admin_panel_settings_outlined), selectedIcon: Icon(Icons.admin_panel_settings), label: 'Admin'),
-        ];
-
-        if (index >= pages.length) index = 0;
-
-        return Scaffold(
-          body: IndexedStack(index: index, children: pages),
-          bottomNavigationBar: NavigationBar(
-            selectedIndex: index,
-            onDestinationSelected: (i) => setState(() => index = i),
-            destinations: destinations,
-          ),
         );
       },
     );
@@ -285,7 +165,6 @@ class Repo {
       ...data,
       'createdBy': data['createdBy'] ?? user?.uid,
       'createdByEmail': data['createdByEmail'] ?? user?.email,
-      'deletionRequested': data['deletionRequested'] ?? false,
       'updatedBy': user?.uid,
       'updatedByEmail': user?.email,
       'updatedAt': FieldValue.serverTimestamp(),
@@ -427,6 +306,47 @@ class _LoginPageState extends State<LoginPage> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class HomePage extends StatefulWidget {
+  const HomePage({super.key});
+  @override State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  int index = 0;
+  @override
+  Widget build(BuildContext context) {
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
+      builder: (context, snap) {
+        final profile = snap.data?.data() ?? {};
+        final isAdmin = profile['role'] == 'admin';
+        final pages = <Widget>[
+          const DashboardPage(),
+          const TransactionsPage(),
+          const PartiesPage(),
+          const ProductionPage(),
+          const ReportsPage(),
+          if (isAdmin) const AdminPage(),
+        ];
+        final destinations = <NavigationDestination>[
+          const NavigationDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard), label: 'Dashboard'),
+          const NavigationDestination(icon: Icon(Icons.swap_horiz), label: 'Transactions'),
+          const NavigationDestination(icon: Icon(Icons.people_outline), label: 'Parties'),
+          const NavigationDestination(icon: Icon(Icons.factory_outlined), label: 'Production'),
+          const NavigationDestination(icon: Icon(Icons.assessment_outlined), label: 'Reports'),
+          if (isAdmin) const NavigationDestination(icon: Icon(Icons.admin_panel_settings_outlined), selectedIcon: Icon(Icons.admin_panel_settings), label: 'Admin'),
+        ];
+        if (index >= pages.length) index = 0;
+        return Scaffold(
+          body: IndexedStack(index: index, children: pages),
+          bottomNavigationBar: NavigationBar(selectedIndex: index, onDestinationSelected: (i) => setState(() => index = i), destinations: destinations),
+        );
+      },
     );
   }
 }
@@ -1135,127 +1055,6 @@ class AdminPage extends StatelessWidget {
               ));
             }).toList());
           },
-        ),
-        const SizedBox(height: 22),
-        const Text(
-          'Backup & Restore',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 8),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Protect all Daily Hisab business data with an Admin backup.',
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: () async {
-                          try {
-                            await BackupRestoreService.instance.shareBackup();
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Backup prepared successfully.',
-                                  ),
-                                ),
-                              );
-                            }
-                          } catch (e) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'Backup failed: $e',
-                                  ),
-                                ),
-                              );
-                            }
-                          }
-                        },
-                        icon: const Icon(Icons.backup),
-                        label: const Text('Backup'),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () async {
-                          final confirmed = await showDialog<bool>(
-                            context: context,
-                            builder: (dialogContext) {
-                              return AlertDialog(
-                                title: const Text('Restore Backup?'),
-                                content: const Text(
-                                  'Restore will write the records from the '
-                                  'selected Daily Hisab backup into the app. '
-                                  'Existing records with the same IDs will be '
-                                  'replaced. Continue?',
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.of(dialogContext).pop(false),
-                                    child: const Text('Cancel'),
-                                  ),
-                                  FilledButton(
-                                    onPressed: () =>
-                                        Navigator.of(dialogContext).pop(true),
-                                    child: const Text('Restore'),
-                                  ),
-                                ],
-                              );
-                            },
-                          );
-
-                          if (confirmed != true || !context.mounted) {
-                            return;
-                          }
-
-                          try {
-                            final count =
-                                await BackupRestoreService.instance
-                                    .restoreFromFile();
-
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    count == 0
-                                        ? 'Restore cancelled.'
-                                        : '$count records restored successfully.',
-                                  ),
-                                ),
-                              );
-                            }
-                          } catch (e) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'Restore failed: $e',
-                                  ),
-                                ),
-                              );
-                            }
-                          }
-                        },
-                        icon: const Icon(Icons.restore),
-                        label: const Text('Restore'),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
         ),
         const SizedBox(height: 22),
         const Text('Deletion approvals', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),

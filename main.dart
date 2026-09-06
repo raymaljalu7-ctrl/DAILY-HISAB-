@@ -76,7 +76,7 @@ class _DailyHisabHomeState extends State<DailyHisabHome> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     DropdownButtonFormField<String>(
-                      value: type,
+                        initialValue: type,
                       decoration: const InputDecoration(
                         labelText: 'Type',
                         border: OutlineInputBorder(),
