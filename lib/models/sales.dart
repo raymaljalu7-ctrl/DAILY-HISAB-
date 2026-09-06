@@ -6,34 +6,9 @@ class SaleItem {
   final double quantity;
   final double unitPrice;
   final double amount;
-
-  const SaleItem({
-    required this.productId,
-    required this.productName,
-    required this.quantity,
-    required this.unitPrice,
-    required this.amount,
-  });
-
-  factory SaleItem.fromMap(Map<String, dynamic> data) {
-    return SaleItem(
-      productId: data['productId']?.toString() ?? '',
-      productName: data['productName']?.toString() ?? '',
-      quantity: (data['quantity'] as num?)?.toDouble() ?? 0,
-      unitPrice: (data['unitPrice'] as num?)?.toDouble() ?? 0,
-      amount: (data['amount'] as num?)?.toDouble() ?? 0,
-    );
-  }
-
-  Map<String, dynamic> toMap() {
-    return {
-      'productId': productId,
-      'productName': productName,
-      'quantity': quantity,
-      'unitPrice': unitPrice,
-      'amount': amount,
-    };
-  }
+  const SaleItem({required this.productId, required this.productName, required this.quantity, required this.unitPrice, required this.amount});
+  factory SaleItem.fromMap(Map<String, dynamic> data) => SaleItem(productId: data['productId']?.toString() ?? '', productName: data['productName']?.toString() ?? '', quantity: (data['quantity'] as num?)?.toDouble() ?? 0, unitPrice: (data['unitPrice'] as num?)?.toDouble() ?? 0, amount: (data['amount'] as num?)?.toDouble() ?? 0);
+  Map<String, dynamic> toMap() => {'productId': productId, 'productName': productName, 'quantity': quantity, 'unitPrice': unitPrice, 'amount': amount};
 }
 
 class Sale {
@@ -48,81 +23,14 @@ class Sale {
   final double paymentReceived;
   final double outstanding;
   final String paymentStatus;
+  final String paymentAccount;
 
-  const Sale({
-    required this.id,
-    required this.date,
-    required this.shopId,
-    required this.shopName,
-    required this.items,
-    required this.grossAmount,
-    required this.commission,
-    required this.netAmount,
-    this.paymentReceived = 0,
-    this.outstanding = 0,
-    this.paymentStatus = 'Pending',
-  });
+  const Sale({required this.id, required this.date, required this.shopId, required this.shopName, required this.items, required this.grossAmount, required this.commission, required this.netAmount, this.paymentReceived = 0, this.outstanding = 0, this.paymentStatus = 'Pending', this.paymentAccount = 'Cash'});
 
   factory Sale.fromMap(String id, Map<String, dynamic> data) {
     final rawItems = data['items'] as List<dynamic>? ?? [];
-
-    return Sale(
-      id: id,
-      date: (data['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      shopId: data['shopId']?.toString() ?? '',
-      shopName: data['shopName']?.toString() ?? '',
-      items: rawItems
-          .whereType<Map>()
-          .map((item) => SaleItem.fromMap(Map<String, dynamic>.from(item)))
-          .toList(),
-      grossAmount: (data['grossAmount'] as num?)?.toDouble() ?? 0,
-      commission: (data['commission'] as num?)?.toDouble() ?? 0,
-      netAmount: (data['netAmount'] as num?)?.toDouble() ?? 0,
-      paymentReceived: (data['paymentReceived'] as num?)?.toDouble() ?? 0,
-      outstanding: (data['outstanding'] as num?)?.toDouble() ?? 0,
-      paymentStatus: data['paymentStatus']?.toString() ?? 'Pending',
-    );
+    return Sale(id: id, date: (data['date'] as Timestamp?)?.toDate() ?? DateTime.now(), shopId: data['shopId']?.toString() ?? '', shopName: data['shopName']?.toString() ?? '', items: rawItems.whereType<Map>().map((x) => SaleItem.fromMap(Map<String, dynamic>.from(x))).toList(), grossAmount: (data['grossAmount'] as num?)?.toDouble() ?? 0, commission: (data['commission'] as num?)?.toDouble() ?? 0, netAmount: (data['netAmount'] as num?)?.toDouble() ?? 0, paymentReceived: (data['paymentReceived'] as num?)?.toDouble() ?? 0, outstanding: (data['outstanding'] as num?)?.toDouble() ?? 0, paymentStatus: data['paymentStatus']?.toString() ?? 'Pending', paymentAccount: data['paymentAccount']?.toString() ?? 'Cash');
   }
 
-  Map<String, dynamic> toMap() {
-    return {
-      'date': Timestamp.fromDate(date),
-      'shopId': shopId,
-      'shopName': shopName,
-      'items': items.map((item) => item.toMap()).toList(),
-      'grossAmount': grossAmount,
-      'commission': commission,
-      'netAmount': netAmount,
-      'paymentReceived': paymentReceived,
-      'outstanding': outstanding,
-      'paymentStatus': paymentStatus,
-    };
-  }
-
-  Sale copyWith({
-    DateTime? date,
-    String? shopId,
-    String? shopName,
-    List<SaleItem>? items,
-    double? grossAmount,
-    double? commission,
-    double? netAmount,
-    double? paymentReceived,
-    double? outstanding,
-    String? paymentStatus,
-  }) {
-    return Sale(
-      id: id,
-      date: date ?? this.date,
-      shopId: shopId ?? this.shopId,
-      shopName: shopName ?? this.shopName,
-      items: items ?? this.items,
-      grossAmount: grossAmount ?? this.grossAmount,
-      commission: commission ?? this.commission,
-      netAmount: netAmount ?? this.netAmount,
-      paymentReceived: paymentReceived ?? this.paymentReceived,
-      outstanding: outstanding ?? this.outstanding,
-      paymentStatus: paymentStatus ?? this.paymentStatus,
-    );
-  }
+  Map<String, dynamic> toMap() => {'date': Timestamp.fromDate(date), 'shopId': shopId, 'shopName': shopName, 'items': items.map((x) => x.toMap()).toList(), 'grossAmount': grossAmount, 'commission': commission, 'netAmount': netAmount, 'paymentReceived': paymentReceived, 'outstanding': outstanding, 'paymentStatus': paymentStatus, 'paymentAccount': paymentAccount};
 }
