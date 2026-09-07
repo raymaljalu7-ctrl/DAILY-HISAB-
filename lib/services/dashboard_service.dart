@@ -43,8 +43,11 @@ class DashboardService {
   DateTime _date(dynamic value) {
     if (value is Timestamp) return value.toDate();
     if (value is DateTime) return value;
+    if (value is String) return DateTime.tryParse(value) ?? DateTime.fromMillisecondsSinceEpoch(0);
     return DateTime.fromMillisecondsSinceEpoch(0);
   }
+
+  double _number(dynamic value) => value is num ? value.toDouble() : double.tryParse(value?.toString() ?? '') ?? 0;
 
   bool _inRange(DateTime date, DateTime from, DateTime to) {
     final start = DateTime(from.year, from.month, from.day);
@@ -53,9 +56,11 @@ class DashboardService {
   }
 
   String _account(Map<String, dynamic> data) {
-    final value = data['account'] ?? data['paymentAccount'] ?? data['paymentMode'];
-    return value?.toString() == 'Bank' ? 'Bank' : 'Cash';
+    final value = data['account'] ?? data['paymentAccount'] ?? data['paymentMode'] ?? data['mode'];
+    return value?.toString().trim().toLowerCase() == 'bank' ? 'Bank' : 'Cash';
   }
+
+  String _type(Map<String, dynamic> data) => (data['type'] ?? data['transactionType'] ?? '').toString().trim().toLowerCase();
 
   Future<DashboardSummary> calculate({required DateTime from, required DateTime to}) async {
     final salesSnapshot = await _collection('sales').get();
@@ -81,21 +86,22 @@ class DashboardService {
     for (final doc in salesSnapshot.docs) {
       final data = doc.data();
       if (!_inRange(_date(data['date']), from, to)) continue;
-      sales += (data['grossAmount'] as num?)?.toDouble() ?? 0;
-      paymentsReceived += (data['paymentReceived'] as num?)?.toDouble() ?? 0;
-      outstanding += (data['outstanding'] as num?)?.toDouble() ?? 0;
-      commission += (data['commission'] as num?)?.toDouble() ?? 0;
+      sales += _number(data['grossAmount']);
+      paymentsReceived += _number(data['paymentReceived']);
+      outstanding += _number(data['outstanding']);
+      commission += _number(data['commission']);
     }
 
     for (final doc in transactionSnapshot.docs) {
       final data = doc.data();
       if (!_inRange(_date(data['date']), from, to)) continue;
-      final type = data['type']?.toString() ?? '';
-      final amount = (data['amount'] as num?)?.toDouble() ?? 0;
+      final type = _type(data);
+      final amount = _number(data['amount']);
       final account = _account(data);
-      if (type == 'Receipt') {
+
+      if (type == 'receipt' || type == 'payment received' || type == 'money received') {
         paymentsReceived += amount;
-      } else if (type == 'Payment') {
+      } else if (type == 'payment' || type == 'commission payment' || type == 'expense payment' || type == 'money paid') {
         paymentsMade += amount;
         if (account == 'Bank') {
           bankPaymentsMade += amount;
@@ -108,25 +114,25 @@ class DashboardService {
     for (final doc in expenseSnapshot.docs) {
       final data = doc.data();
       if (!_inRange(_date(data['date']), from, to)) continue;
-      expenses += (data['amount'] as num?)?.toDouble() ?? 0;
+      expenses += _number(data['amount']);
     }
     for (final doc in salarySnapshot.docs) {
       final data = doc.data();
       if (!_inRange(_date(data['date']), from, to)) continue;
-      salary += (data['amount'] as num?)?.toDouble() ?? 0;
+      salary += _number(data['amount']);
     }
     for (final doc in capitalSnapshot.docs) {
       final data = doc.data();
       if (!_inRange(_date(data['date']), from, to)) continue;
-      final type = data['type']?.toString() ?? '';
-      final amount = (data['amount'] as num?)?.toDouble() ?? 0;
-      if (type == 'Capital Received') capitalReceived += amount;
-      if (type == 'Capital Returned') capitalReturned += amount;
+      final type = _type(data);
+      final amount = _number(data['amount']);
+      if (type == 'capital received') capitalReceived += amount;
+      if (type == 'capital returned') capitalReturned += amount;
     }
     for (final doc in productionSnapshot.docs) {
       final data = doc.data();
       if (!_inRange(_date(data['date']), from, to)) continue;
-      productionBoxes += (data['quantity'] as num?)?.toDouble() ?? 0;
+      productionBoxes += _number(data['quantity']);
     }
 
     return DashboardSummary(
