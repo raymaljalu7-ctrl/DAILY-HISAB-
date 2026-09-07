@@ -26,8 +26,9 @@ class _SalesRow {
 }
 
 class _SalesFixedPageState extends State<SalesFixedPage> {
-  final rows = <_SalesRow>[_SalesRow()];
+  final rows = <_SalesRow>[];
   final paymentController = TextEditingController();
+  final formVersion = ValueNotifier<int>(0);
   DateTime selectedDate = DateTime.now();
   String? selectedShopId, assignedShopId, editingSaleId;
   RetailShop? selectedShop;
@@ -41,9 +42,17 @@ class _SalesFixedPageState extends State<SalesFixedPage> {
   double get outstanding => (netAmount - paymentReceived).clamp(0, double.infinity).toDouble();
   String fmt(DateTime d) => '${d.day.toString().padLeft(2,'0')}-${d.month.toString().padLeft(2,'0')}-${d.year}';
   void msg(String x) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(x))); }
+  void notifyFormChanged() => formVersion.value++;
 
-  @override void initState() { super.initState(); _loadProfile(); }
-  @override void dispose() { for (final r in rows) r.dispose(); paymentController.dispose(); super.dispose(); }
+  _SalesRow newRow() {
+    final row = _SalesRow();
+    row.quantityController.addListener(notifyFormChanged);
+    row.rateController.addListener(notifyFormChanged);
+    return row;
+  }
+
+  @override void initState() { super.initState(); rows.add(newRow()); paymentController.addListener(notifyFormChanged); _loadProfile(); }
+  @override void dispose() { for (final r in rows) r.dispose(); paymentController.dispose(); formVersion.dispose(); super.dispose(); }
 
   Future<void> _loadProfile() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
@@ -56,13 +65,15 @@ class _SalesFixedPageState extends State<SalesFixedPage> {
     } catch (e) { if (mounted) { setState(() => loadingProfile = false); msg('Unable to load user profile: $e'); } }
   }
 
-  void addRow() => setState(() => rows.add(_SalesRow()));
-  void removeRow(int i) { if (rows.length == 1) return; final r = rows.removeAt(i); r.dispose(); setState(() {}); }
+  void addRow() => setState(() => rows.add(newRow()));
+  void removeRow(int i) { if (rows.length == 1) return; final r = rows.removeAt(i); r.dispose(); notifyFormChanged(); setState(() {}); }
   Future<void> pickDate() async { final x = await showDatePicker(context: context, initialDate: selectedDate, firstDate: DateTime(2020), lastDate: DateTime(2100)); if (x != null && mounted) setState(() => selectedDate = x); }
 
   void resetForm() {
-    for (final r in rows) r.dispose(); rows..clear()..add(_SalesRow());
+    for (final r in rows) r.dispose();
+    rows..clear()..add(newRow());
     paymentController.clear(); editingSaleId = null; selectedDate = DateTime.now(); paymentAccount = 'Cash'; selectedShopId = retailUser ? assignedShopId : null; selectedShop = null;
+    notifyFormChanged();
   }
 
   Future<void> save(List<RetailShop> shops, List<Product> products) async {
@@ -100,10 +111,14 @@ class _SalesFixedPageState extends State<SalesFixedPage> {
   }
 
   void edit(Sale sale, List<RetailShop> shops) {
-    for (final r in rows) r.dispose(); rows.clear();
-    for (final item in sale.items) rows.add(_SalesRow()..productId=item.productId..quantityController.text=item.quantity.toString()..rateController.text=item.unitPrice.toStringAsFixed(2));
-    if (rows.isEmpty) rows.add(_SalesRow());
-    selectedDate = sale.date; selectedShopId = sale.shopId; selectedShop = shops.where((s) => s.id == sale.shopId).firstOrNull; paymentController.text = sale.paymentReceived.toStringAsFixed(2); paymentAccount = sale.paymentAccount.isEmpty ? 'Cash' : sale.paymentAccount; editingSaleId = sale.id; setState(() {});
+    for (final r in rows) r.dispose();
+    rows.clear();
+    for (final item in sale.items) {
+      final r = newRow();
+      r.productId = item.productId; r.quantityController.text = item.quantity.toString(); r.rateController.text = item.unitPrice.toStringAsFixed(2); rows.add(r);
+    }
+    if (rows.isEmpty) rows.add(newRow());
+    selectedDate = sale.date; selectedShopId = sale.shopId; selectedShop = shops.where((s) => s.id == sale.shopId).firstOrNull; paymentController.text = sale.paymentReceived.toStringAsFixed(2); paymentAccount = sale.paymentAccount.isEmpty ? 'Cash' : sale.paymentAccount; editingSaleId = sale.id; notifyFormChanged(); setState(() {});
   }
 
   Future<void> delete(Sale sale) async { try { final isAdmin = await FirestoreService.instance.isAdmin(); await SalesService.instance.deleteSale(sale.id); msg(isAdmin ? 'Sales transaction deleted.' : 'Delete request sent to Admin for approval.'); } catch (e) { msg('Unable to delete sale: $e'); } }
@@ -144,9 +159,9 @@ class _SalesFixedPageState extends State<SalesFixedPage> {
               DropdownButtonFormField<String>(initialValue:selectedShopId,items:shops.map((s)=>DropdownMenuItem(value:s.id,child:Text(s.name))).toList(),onChanged:(v)=>setState(()=>selectedShopId=v),decoration:const InputDecoration(labelText:'Retail Shop',border:OutlineInputBorder())),const SizedBox(height:14),
               ...List.generate(rows.length,(i)=>_rowWidget(i,products)),
               Align(alignment:Alignment.centerLeft,child:OutlinedButton.icon(onPressed:addRow,icon:const Icon(Icons.add),label:const Text('ADD ITEM'))),const SizedBox(height:12),
-              TextField(controller:paymentController,keyboardType:const TextInputType.numberWithOptions(decimal:true),onChanged:(_)=>setState((){}),decoration:const InputDecoration(labelText:'Payment Received',prefixText:'Rs. ',border:OutlineInputBorder())),const SizedBox(height:10),
+              TextField(controller:paymentController,keyboardType:const TextInputType.numberWithOptions(decimal:true),decoration:const InputDecoration(labelText:'Payment Received',prefixText:'Rs. ',border:OutlineInputBorder())),const SizedBox(height:10),
               DropdownButtonFormField<String>(initialValue:paymentAccount,items:const[DropdownMenuItem(value:'Cash',child:Text('Cash')),DropdownMenuItem(value:'Bank',child:Text('Bank'))],onChanged:(v){if(v!=null)setState(()=>paymentAccount=v);},decoration:const InputDecoration(labelText:'Payment Account',border:OutlineInputBorder())),const SizedBox(height:12),
-              Align(alignment:Alignment.centerLeft,child:Text('Gross: Rs. ${grossAmount.toStringAsFixed(2)}  •  Commission: Rs. ${commissionAmount.toStringAsFixed(2)}  •  Net: Rs. ${netAmount.toStringAsFixed(2)}  •  Outstanding: Rs. ${outstanding.toStringAsFixed(2)}')),
+              ValueListenableBuilder<int>(valueListenable:formVersion,builder:(context,_,__)=>Align(alignment:Alignment.centerLeft,child:Text('Gross: Rs. ${grossAmount.toStringAsFixed(2)}  •  Commission: Rs. ${commissionAmount.toStringAsFixed(2)}  •  Net: Rs. ${netAmount.toStringAsFixed(2)}  •  Outstanding: Rs. ${outstanding.toStringAsFixed(2)}'))),
               const SizedBox(height:14),SizedBox(height:50,width:double.infinity,child:FilledButton.icon(onPressed:saving?null:()=>save(shops,products),icon:const Icon(Icons.save),label:Text(saving?'SAVING...':editingSaleId==null?'SAVE SALES':'UPDATE SALES'))),
             ]))),const SizedBox(height:18),const Text('Sales History',style:TextStyle(fontSize:19,fontWeight:FontWeight.bold)),
             StreamBuilder<List<Sale>>(stream:SalesService.instance.watchSales(),builder:(context,h){if(h.hasError)return Text('Unable to load sales: ${h.error}');if(!h.hasData)return const CircularProgressIndicator();return Column(children:h.data!.map((s)=>Card(child:ListTile(title:Text('${s.shopName} • Rs. ${s.netAmount.toStringAsFixed(2)}'),subtitle:Text('${fmt(s.date)} • ${s.items.length} item(s) • ${s.paymentStatus}'),trailing:Wrap(children:[IconButton(onPressed:()=>edit(s,shops),icon:const Icon(Icons.edit_outlined)),IconButton(onPressed:()=>delete(s),icon:const Icon(Icons.delete_outline))]))).toList());}),
@@ -156,5 +171,6 @@ class _SalesFixedPageState extends State<SalesFixedPage> {
     ));
   }
 
-  Widget _rowWidget(int i,List<Product> products){final r=rows[i];return Card(margin:const EdgeInsets.only(bottom:10),child:Padding(padding:const EdgeInsets.all(10),child:Column(children:[Row(children:[Expanded(child:DropdownButtonFormField<String>(initialValue:r.productId,items:products.map((p)=>DropdownMenuItem(value:p.id,child:Text(p.name))).toList(),onChanged:(v)=>setState(()=>r.productId=v),decoration:const InputDecoration(labelText:'Bakery Item',border:OutlineInputBorder()))),if(rows.length>1)IconButton(onPressed:()=>removeRow(i),icon:const Icon(Icons.delete_outline))]),const SizedBox(height:8),Row(children:[Expanded(child:TextField(controller:r.quantityController,keyboardType:const TextInputType.numberWithOptions(decimal:true),onChanged:(_)=>setState((){}),decoration:const InputDecoration(labelText:'Quantity',border:OutlineInputBorder()))),const SizedBox(width:10),Expanded(child:TextField(controller:r.rateController,keyboardType:const TextInputType.numberWithOptions(decimal:true),onChanged:(_)=>setState((){}),decoration:const InputDecoration(labelText:'Rate',prefixText:'Rs. ',border:OutlineInputBorder()))),const SizedBox(width:10),SizedBox(width:90,child:Text('Rs. ${r.amount.toStringAsFixed(2)}',textAlign:TextAlign.right))])])));}
+  Widget _rowWidget(int i,List<Product> products){final r=rows[i];return Card(margin:const EdgeInsets.only(bottom:10),child:Padding(padding:const EdgeInsets.all(10),child:Column(children:[Row(children:[Expanded(child:DropdownButtonFormField<String>(initialValue:r.productId,items:products.map((p)=>DropdownMenuItem(value:p.id,child:Text(p.name))).toList(),onChanged:(v){r.productId=v; notifyFormChanged(); setState(() {});},decoration:const InputDecoration(labelText:'Bakery Item',border:OutlineInputBorder()))),if(rows.length>1)IconButton(onPressed:()=>removeRow(i),icon:const Icon(Icons.delete_outline))]),const SizedBox(height:8),Row(children:[Expanded(child:TextField(controller:r.quantityController,keyboardType:const TextInputType.numberWithOptions(decimal:true),decoration:const InputDecoration(labelText:'Quantity',border:OutlineInputBorder()))),const SizedBox(width:10),Expanded(child:TextField(controller:r.rateController,keyboardType:const TextInputType.numberWithOptions(decimal:true),decoration:const InputDecoration(labelText:'Rate',prefixText:'Rs. ',border:OutlineInputBorder()))),const SizedBox(width:10),ValueListenableBuilder<int>(valueListenable:formVersion,builder:(context,_,__)=>
+      SizedBox(width:90,child:Text('Rs. ${r.amount.toStringAsFixed(2)}',textAlign:TextAlign.right)))])])));}
 }
