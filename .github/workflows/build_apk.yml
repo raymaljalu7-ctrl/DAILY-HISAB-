@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+env:
+  GRADLE_OPTS: "-Xmx6g -Dorg.gradle.daemon=false -Dorg.gradle.parallel=false"
+  JAVA_TOOL_OPTIONS: "-Xmx6g"
+
 jobs:
   build-apk:
     runs-on: ubuntu-latest
