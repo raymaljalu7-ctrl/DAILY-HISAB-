@@ -19,10 +19,12 @@ class _SalesRow {
   String? productId;
   final quantityController = TextEditingController();
   final rateController = TextEditingController();
+  final quantityFocus = FocusNode();
+  final rateFocus = FocusNode();
   double get quantity => double.tryParse(quantityController.text.trim()) ?? 0;
   double get rate => double.tryParse(rateController.text.trim()) ?? 0;
   double get amount => quantity * rate;
-  void dispose() { quantityController.dispose(); rateController.dispose(); }
+  void dispose() { quantityController.dispose(); rateController.dispose(); quantityFocus.dispose(); rateFocus.dispose(); }
 }
 
 class _SalesFixedPageState extends State<SalesFixedPage> {
@@ -159,7 +161,7 @@ class _SalesFixedPageState extends State<SalesFixedPage> {
               DropdownButtonFormField<String>(initialValue:selectedShopId,items:shops.map((s)=>DropdownMenuItem(value:s.id,child:Text(s.name))).toList(),onChanged:(v)=>setState(()=>selectedShopId=v),decoration:const InputDecoration(labelText:'Retail Shop',border:OutlineInputBorder())),const SizedBox(height:14),
               ...List.generate(rows.length,(i)=>_rowWidget(i,products)),
               Align(alignment:Alignment.centerLeft,child:OutlinedButton.icon(onPressed:addRow,icon:const Icon(Icons.add),label:const Text('ADD ITEM'))),const SizedBox(height:12),
-              TextField(controller:paymentController,keyboardType:TextInputType.number,textInputAction:TextInputAction.next,autocorrect:false,enableSuggestions:false,decoration:const InputDecoration(labelText:'Payment Received',prefixText:'Rs. ',border:OutlineInputBorder())),const SizedBox(height:10),
+              TextField(controller:paymentController,keyboardType:const TextInputType.numberWithOptions(decimal:true),textInputAction:TextInputAction.done,autocorrect:false,enableSuggestions:false,decoration:const InputDecoration(labelText:'Payment Received',prefixText:'Rs. ',border:OutlineInputBorder())),const SizedBox(height:10),
               DropdownButtonFormField<String>(initialValue:paymentAccount,items:const[DropdownMenuItem(value:'Cash',child:Text('Cash')),DropdownMenuItem(value:'Bank',child:Text('Bank'))],onChanged:(v){if(v!=null)setState(()=>paymentAccount=v);},decoration:const InputDecoration(labelText:'Payment Account',border:OutlineInputBorder())),const SizedBox(height:12),
               ValueListenableBuilder<int>(valueListenable:formVersion,builder:(context,_,__)=>Align(alignment:Alignment.centerLeft,child:Text('Gross: Rs. ${grossAmount.toStringAsFixed(2)}  •  Commission: Rs. ${commissionAmount.toStringAsFixed(2)}  •  Net: Rs. ${netAmount.toStringAsFixed(2)}  •  Outstanding: Rs. ${outstanding.toStringAsFixed(2)}'))),
               const SizedBox(height:14),SizedBox(height:50,width:double.infinity,child:FilledButton.icon(onPressed:saving?null:()=>save(shops,products),icon:const Icon(Icons.save),label:Text(saving?'SAVING...':editingSaleId==null?'SAVE SALES':'UPDATE SALES'))),
@@ -171,6 +173,28 @@ class _SalesFixedPageState extends State<SalesFixedPage> {
     ));
   }
 
-  Widget _rowWidget(int i,List<Product> products){final r=rows[i];return Card(margin:const EdgeInsets.only(bottom:10),child:Padding(padding:const EdgeInsets.all(10),child:Column(children:[Row(children:[Expanded(child:DropdownButtonFormField<String>(initialValue:r.productId,items:products.map((p)=>DropdownMenuItem(value:p.id,child:Text(p.name))).toList(),onChanged:(v){r.productId=v; notifyFormChanged(); setState(() {});},decoration:const InputDecoration(labelText:'Bakery Item',border:OutlineInputBorder()))),if(rows.length>1)IconButton(onPressed:()=>removeRow(i),icon:const Icon(Icons.delete_outline))]),const SizedBox(height:8),Row(children:[Expanded(child:TextField(controller:r.quantityController,keyboardType:TextInputType.number,textInputAction:TextInputAction.next,autocorrect:false,enableSuggestions:false,onSubmitted:(_){FocusScope.of(context).nextFocus();},decoration:const InputDecoration(labelText:'Quantity',border:OutlineInputBorder()))),const SizedBox(width:10),Expanded(child:TextField(controller:r.rateController,keyboardType:TextInputType.number,textInputAction:TextInputAction.next,autocorrect:false,enableSuggestions:false,onSubmitted:(_){FocusScope.of(context).nextFocus();},decoration:const InputDecoration(labelText:'Rate',prefixText:'Rs. ',border:OutlineInputBorder()))),const SizedBox(width:10),ValueListenableBuilder<int>(valueListenable:formVersion,builder:(context,_,__)=>
-      SizedBox(width:90,child:Text('Rs. ${r.amount.toStringAsFixed(2)}',textAlign:TextAlign.right)))])])));}
+  Widget _rowWidget(int i,List<Product> products){
+    final r=rows[i];
+    return Card(
+      key: ValueKey(r),
+      margin:const EdgeInsets.only(bottom:10),
+      child:Padding(
+        padding:const EdgeInsets.all(10),
+        child:Column(children:[
+          Row(children:[
+            Expanded(child:DropdownButtonFormField<String>(initialValue:r.productId,items:products.map((p)=>DropdownMenuItem(value:p.id,child:Text(p.name))).toList(),onChanged:(v){r.productId=v;notifyFormChanged();setState(() {});},decoration:const InputDecoration(labelText:'Bakery Item',border:OutlineInputBorder()))),
+            if(rows.length>1)IconButton(onPressed:()=>removeRow(i),icon:const Icon(Icons.delete_outline))
+          ]),
+          const SizedBox(height:8),
+          Row(children:[
+            Expanded(child:TextField(key:ValueKey('sales-quantity-${r.hashCode}'),controller:r.quantityController,focusNode:r.quantityFocus,keyboardType:const TextInputType.numberWithOptions(decimal:true),textInputAction:TextInputAction.next,autocorrect:false,enableSuggestions:false,onSubmitted:(_)=>r.rateFocus.requestFocus(),decoration:const InputDecoration(labelText:'Quantity',border:OutlineInputBorder()))),
+            const SizedBox(width:10),
+            Expanded(child:TextField(key:ValueKey('sales-rate-${r.hashCode}'),controller:r.rateController,focusNode:r.rateFocus,keyboardType:const TextInputType.numberWithOptions(decimal:true),textInputAction:TextInputAction.done,autocorrect:false,enableSuggestions:false,onSubmitted:(_)=>r.rateFocus.unfocus(),decoration:const InputDecoration(labelText:'Rate',prefixText:'Rs. ',border:OutlineInputBorder()))),
+            const SizedBox(width:10),
+            ValueListenableBuilder<int>(valueListenable:formVersion,builder:(context,_,__)=>SizedBox(width:90,child:Text('Rs. ${r.amount.toStringAsFixed(2)}',textAlign:TextAlign.right)))
+          ])
+        ])
+      )
+    );
+  }
 }
