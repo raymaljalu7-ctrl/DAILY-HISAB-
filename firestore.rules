@@ -5,10 +5,9 @@ service cloud.firestore {
     function signedIn() { return request.auth != null; }
     function myUid() { return request.auth.uid; }
     function myProfile() { return get(/databases/$(database)/documents/users/$(myUid())).data; }
-    function isApproved() { return signedIn() && myProfile().status == 'approved'; }
-    function isAdmin() { return signedIn() && myProfile().status == 'approved' && myProfile().role == 'admin'; }
+    function isAdmin() { return signedIn() && myProfile().role == 'admin'; }
+    function isApproved() { return signedIn() && (myProfile().role == 'admin' || myProfile().status == 'approved'); }
     function isRetailUser() { return isApproved() && myProfile().role == 'retail_shop_user'; }
-    function ownShop() { return resource.data.shopId == myProfile().shopId; }
     function newOwnShop() { return request.resource.data.shopId == myProfile().shopId; }
 
     match /users/{uid} {
