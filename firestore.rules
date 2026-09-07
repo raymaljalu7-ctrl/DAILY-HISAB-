@@ -12,6 +12,8 @@ service cloud.firestore {
 
     match /users/{uid} {
       allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      // Admin can create/manage every user profile. A newly authenticated user
+      // may only create their own basic pending Business User profile.
       allow create: if isAdmin() || (signedIn() && request.auth.uid == uid && request.resource.data.role == 'user' && request.resource.data.status == 'pending');
       allow update, delete: if isAdmin();
     }
@@ -52,8 +54,12 @@ service cloud.firestore {
       allow read, update, delete: if isAdmin();
     }
 
+    // Non-admin edit/delete requests are stored here and are visible only to Admin.
     match /changeRequests/{requestId} {
-      allow create: if isApproved() && request.resource.data.requestedBy == request.auth.uid && request.resource.data.status == 'pending' && request.resource.data.action in ['edit', 'delete'];
+      allow create: if isApproved()
+        && request.resource.data.requestedBy == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.action in ['edit', 'delete'];
       allow get, list: if isAdmin();
       allow update, delete: if isAdmin();
     }
