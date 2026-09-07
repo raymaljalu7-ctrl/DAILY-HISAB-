@@ -52,6 +52,11 @@ class DashboardService {
     return !date.isBefore(start) && !date.isAfter(end);
   }
 
+  String _account(Map<String, dynamic> data) {
+    final value = data['account'] ?? data['paymentAccount'] ?? data['paymentMode'];
+    return value?.toString() == 'Bank' ? 'Bank' : 'Cash';
+  }
+
   Future<DashboardSummary> calculate({required DateTime from, required DateTime to}) async {
     final salesSnapshot = await _collection('sales').get();
     final transactionSnapshot = await _collection('transactions').get();
@@ -87,7 +92,7 @@ class DashboardService {
       if (!_inRange(_date(data['date']), from, to)) continue;
       final type = data['type']?.toString() ?? '';
       final amount = (data['amount'] as num?)?.toDouble() ?? 0;
-      final account = data['account']?.toString() ?? 'Cash';
+      final account = _account(data);
       if (type == 'Receipt') {
         paymentsReceived += amount;
       } else if (type == 'Payment') {
