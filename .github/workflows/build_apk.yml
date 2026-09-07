@@ -9,10 +9,6 @@ on:
 permissions:
   contents: read
 
-env:
-  GRADLE_OPTS: "-Xmx6g -Dorg.gradle.daemon=false -Dorg.gradle.parallel=false"
-  JAVA_TOOL_OPTIONS: "-Xmx6g"
-
 jobs:
   build-apk:
     runs-on: ubuntu-latest
@@ -29,8 +25,11 @@ jobs:
         run: flutter pub get
       - name: Analyze
         run: flutter analyze --no-fatal-infos
-      - name: Build release APK
-        run: flutter build apk --release
+      - name: Build release APK (ARM64)
+        env:
+          GRADLE_OPTS: "-Xmx4g -Dorg.gradle.daemon=false -Dorg.gradle.parallel=false -Dorg.gradle.workers.max=1"
+          JAVA_TOOL_OPTIONS: "-Xmx4g"
+        run: flutter build apk --release --target-platform android-arm64
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
