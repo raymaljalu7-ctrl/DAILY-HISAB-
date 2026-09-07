@@ -8,65 +8,13 @@ class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   DocumentReference<Map<String, dynamic>> get _root => _db.collection('sharedData').doc('dailyHisab');
   CollectionReference<Map<String, dynamic>> collection(String name) => _root.collection(name);
-
-  Future<Map<String, dynamic>> _profile() async {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return {};
-    final snap = await _db.collection('users').doc(uid).get();
-    return snap.data() ?? {};
-  }
-
-  Future<bool> isAdmin() async {
-    final p = await _profile();
-    return p['status'] == 'approved' && p['role'] == 'admin';
-  }
-
-  Future<Map<String, dynamic>> currentProfile() => _profile();
-
-  Map<String, dynamic> _withUser(Map<String, dynamic> data) {
-    final user = FirebaseAuth.instance.currentUser;
-    return {...data, 'createdBy': data['createdBy'] ?? user?.uid, 'createdByEmail': data['createdByEmail'] ?? user?.email, 'deletionRequested': data['deletionRequested'] ?? false, 'updatedBy': user?.uid, 'updatedByEmail': user?.email, 'updatedAt': FieldValue.serverTimestamp()};
-  }
-
-  Stream<List<Map<String, dynamic>>> stream(String name) {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return const Stream.empty();
-    if (name == 'retailShops') {
-      return Stream.fromFuture(_db.collection('users').doc(uid).get()).asyncExpand((profile) {
-        final data = profile.data() ?? {};
-        if (data['role'] == 'retail_shop_user' && data['shopId'] != null) {
-          return collection(name).doc(data['shopId'].toString()).snapshots().map((doc) => doc.exists ? [{'id': doc.id, ...doc.data()!}] : <Map<String, dynamic>>[]);
-        }
-        return collection(name).snapshots().map((snapshot) => snapshot.docs.map((doc) => {'id': doc.id, ...doc.data()}).toList());
-      });
-    }
-    return collection(name).snapshots().map((snapshot) => snapshot.docs.map((doc) => {'id': doc.id, ...doc.data()}).toList());
-  }
-
-  Future<String> add(String name, Map<String, dynamic> data) async {
-    final doc = await collection(name).add(_withUser({...data, 'createdAt': FieldValue.serverTimestamp()}));
-    return doc.id;
-  }
-
-  Future<void> update(String name, String id, Map<String, dynamic> data) async {
-    final reference = collection(name).doc(id);
-    final snapshot = await reference.get();
-    if (!snapshot.exists) throw StateError('Record not found.');
-    final existing = snapshot.data() ?? {};
-    if (await isAdmin()) {
-      await reference.update({...data, 'createdBy': existing['createdBy'], 'createdByEmail': existing['createdByEmail'], 'deletionRequested': existing['deletionRequested'] ?? false, 'updatedBy': FirebaseAuth.instance.currentUser?.uid, 'updatedByEmail': FirebaseAuth.instance.currentUser?.email, 'updatedAt': FieldValue.serverTimestamp()});
-      return;
-    }
-    await ApprovalService.instance.requestEdit(collection: name, recordId: id, currentData: existing, proposedData: data);
-  }
-
-  Future<void> delete(String name, String id) async {
-    final reference = collection(name).doc(id);
-    final snapshot = await reference.get();
-    if (!snapshot.exists) return;
-    if (await isAdmin()) { await reference.delete(); return; }
-    await ApprovalService.instance.requestDelete(collection: name, recordId: id, currentData: snapshot.data() ?? {});
-  }
-
-  Stream<QuerySnapshot<Map<String, dynamic>>> query(String name) => collection(name).snapshots();
+  Future<Map<String,dynamic>> _profile() async { final uid=FirebaseAuth.instance.currentUser?.uid; if(uid==null)return {}; final s=await _db.collection('users').doc(uid).get(); return s.data()??{}; }
+  Future<bool> isAdmin() async { final p=await _profile(); return p['role']=='admin'; }
+  Future<Map<String,dynamic>> currentProfile()=>_profile();
+  Map<String,dynamic> _withUser(Map<String,dynamic> data){final u=FirebaseAuth.instance.currentUser;return {...data,'createdBy':data['createdBy']??u?.uid,'createdByEmail':data['createdByEmail']??u?.email,'deletionRequested':data['deletionRequested']??false,'updatedBy':u?.uid,'updatedByEmail':u?.email,'updatedAt':FieldValue.serverTimestamp()};}
+  Stream<List<Map<String,dynamic>>> stream(String name){final uid=FirebaseAuth.instance.currentUser?.uid;if(uid==null)return const Stream.empty();if(name=='retailShops'){return Stream.fromFuture(_db.collection('users').doc(uid).get()).asyncExpand((p){final d=p.data()??{};if(d['role']=='retail_shop_user'&&d['shopId']!=null)return collection(name).doc(d['shopId'].toString()).snapshots().map((x)=>x.exists?[{'id':x.id,...x.data()!}]:<Map<String,dynamic>>[]);return collection(name).snapshots().map((s)=>s.docs.map((d)=>{'id':d.id,...d.data()}).toList());});}return collection(name).snapshots().map((s)=>s.docs.map((d)=>{'id':d.id,...d.data()}).toList());}
+  Future<String> add(String name,Map<String,dynamic> data) async {final d=await collection(name).add(_withUser({...data,'createdAt':FieldValue.serverTimestamp()}));return d.id;}
+  Future<void> update(String name,String id,Map<String,dynamic> data) async {final r=collection(name).doc(id);final s=await r.get();if(!s.exists)throw StateError('Record not found.');final old=s.data()??{};if(await isAdmin()){await r.update({...data,'createdBy':old['createdBy'],'createdByEmail':old['createdByEmail'],'deletionRequested':old['deletionRequested']??false,'updatedBy':FirebaseAuth.instance.currentUser?.uid,'updatedByEmail':FirebaseAuth.instance.currentUser?.email,'updatedAt':FieldValue.serverTimestamp()});return;}await ApprovalService.instance.requestEdit(collection:name,recordId:id,currentData:old,proposedData:data);}
+  Future<void> delete(String name,String id) async {final r=collection(name).doc(id);final s=await r.get();if(!s.exists)return;if(await isAdmin()){await r.delete();return;}await ApprovalService.instance.requestDelete(collection:name,recordId:id,currentData:s.data()??{});}
+  Stream<QuerySnapshot<Map<String,dynamic>>> query(String name)=>collection(name).snapshots();
 }
