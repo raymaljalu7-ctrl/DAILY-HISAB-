@@ -57,7 +57,15 @@ class ReportService {
     for (final doc in snapshot.docs) {
       final data = doc.data();
       if (!_inRange(_date(data['date']), from, to)) continue;
-      if (type != null && type.isNotEmpty && data['type']?.toString() != type) continue;
+      final rowType = data['type']?.toString() ?? '';
+      // The Payments report must include both money received and money paid.
+      // The optional account filter remains available for dedicated cash/bank reports.
+      if (type != null && type.isNotEmpty) {
+        final matchesRequested = type == 'Receipt'
+            ? (rowType == 'Receipt' || rowType == 'Payment')
+            : rowType == type;
+        if (!matchesRequested) continue;
+      }
       if (account != null && account.isNotEmpty && data['account']?.toString() != account) continue;
       if (effectiveShopId != null && effectiveShopId.isNotEmpty && data['shopId']?.toString() != effectiveShopId) continue;
       rows.add({'id': doc.id, ...data});
