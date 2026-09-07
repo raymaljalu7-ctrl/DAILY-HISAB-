@@ -49,7 +49,7 @@ class ReportService {
     return rows;
   }
 
-  Future<List<Map<String, dynamic>>> transactions({required DateTime from, required DateTime to, String? type, String? shopId}) async {
+  Future<List<Map<String, dynamic>>> transactions({required DateTime from, required DateTime to, String? type, String? shopId, String? account}) async {
     final assignedShopId = await _assignedRetailShopId();
     final effectiveShopId = assignedShopId ?? shopId;
     final snapshot = await _collection('transactions').get();
@@ -58,6 +58,7 @@ class ReportService {
       final data = doc.data();
       if (!_inRange(_date(data['date']), from, to)) continue;
       if (type != null && type.isNotEmpty && data['type']?.toString() != type) continue;
+      if (account != null && account.isNotEmpty && data['account']?.toString() != account) continue;
       if (effectiveShopId != null && effectiveShopId.isNotEmpty && data['shopId']?.toString() != effectiveShopId) continue;
       rows.add({'id': doc.id, ...data});
     }
