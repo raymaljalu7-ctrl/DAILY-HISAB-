@@ -39,3 +39,6 @@ jobs:
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 14
+
+      # Build is intentionally kept on the current-working-version branch so
+      # every app change produces a fresh APK artifact for testing.
