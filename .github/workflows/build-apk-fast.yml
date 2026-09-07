@@ -1,0 +1,35 @@
+name: Build Daily Hisab APK Fast
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [current-working-version]
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.2
+          channel: stable
+          cache: true
+      - name: Get packages
+        run: flutter pub get
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos
+      - name: Disable Jetifier for Flutter build
+        run: |
+          echo "android.enableJetifier=false" >> android/gradle.properties
+          echo "android.useAndroidX=true" >> android/gradle.properties
+      - name: Build release APK
+        env:
+          GRADLE_OPTS: -Xmx4g -Dorg.gradle.daemon=false -Dorg.gradle.parallel=false -Dorg.gradle.workers.max=1
+          JAVA_TOOL_OPTIONS: -Xmx4g
+        run: flutter build apk --release --target-platform android-arm64 --no-shrink
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-hisab-apk-fast
+          path: build/app/outputs/flutter-apk/app-release.apk
