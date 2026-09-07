@@ -2,64 +2,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-class RetailStockPage extends StatelessWidget {
-  const RetailStockPage({super.key});
-
-  DocumentReference<Map<String, dynamic>> _db() => FirebaseFirestore.instance.collection('sharedData').doc('dailyHisab');
-
-  @override
-  Widget build(BuildContext context) {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return const Scaffold(body: Center(child: Text('Please login again.')));
-    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
-      builder: (context, userSnap) {
-        if (!userSnap.hasData) return const Scaffold(body: Center(child: CircularProgressIndicator()));
-        final profile = userSnap.data!.data() ?? {};
-        final shopId = profile['shopId']?.toString();
-        final shopName = profile['shopName']?.toString() ?? 'Assigned Shop';
-        if (shopId == null || shopId.isEmpty) return const Scaffold(body: Center(child: Text('No retail shop is assigned to this user.')));
-        return Scaffold(
-          appBar: AppBar(title: Text('$shopName Stock')),
-          body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: _db().collection('products').snapshots(),
-            builder: (context, productSnap) {
-              if (productSnap.hasError) return Center(child: Text('Unable to load products:\n${productSnap.error}'));
-              if (!productSnap.hasData) return const Center(child: CircularProgressIndicator());
-              final products = productSnap.data!.docs.where((d) => d.data()['active'] != false).toList();
-              return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                stream: _db().collection('stockTransfers').where('shopId', isEqualTo: shopId).snapshots(),
-                builder: (context, transferSnap) => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                  stream: _db().collection('stockOtherReceived').where('shopId', isEqualTo: shopId).snapshots(),
-                  builder: (context, receivedSnap) => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                    stream: _db().collection('sales').where('shopId', isEqualTo: shopId).snapshots(),
-                    builder: (context, salesSnap) {
-                      if (transferSnap.hasError || receivedSnap.hasError || salesSnap.hasError) return Center(child: Text('Unable to load shop stock.\n${transferSnap.error ?? receivedSnap.error ?? salesSnap.error}'));
-                      if (!transferSnap.hasData || !receivedSnap.hasData || !salesSnap.hasData) return const Center(child: CircularProgressIndicator());
-                      final transfers = transferSnap.data!.docs.map((d) => d.data()).toList();
-                      final received = receivedSnap.data!.docs.map((d) => d.data()).toList();
-                      final sales = salesSnap.data!.docs.map((d) => d.data()).toList();
-                      double n(dynamic v) => v is num ? v.toDouble() : double.tryParse('$v') ?? 0;
-                      return ListView(padding: const EdgeInsets.all(16), children: [
-                        Card(child: ListTile(leading: const CircleAvatar(child: Icon(Icons.store)), title: Text(shopName, style: const TextStyle(fontWeight: FontWeight.bold)), subtitle: const Text('Only your assigned shop stock is shown.'))),
-                        const SizedBox(height: 12),
-                        ...products.map((d) {
-                          final p = d.data(); final pid = d.id;
-                          final incoming = transfers.where((x) => x['productId'] == pid).fold<double>(0, (s, x) => s + n(x['quantity']));
-                          final other = received.where((x) => x['productId'] == pid).fold<double>(0, (s, x) => s + n(x['quantity']));
-                          final sold = sales.fold<double>(0, (s, x) { final items = (x['items'] as List?) ?? []; return s + items.whereType<Map>().where((i) => i['productId'] == pid).fold<double>(0, (a, i) => a + n(i['quantity'])); });
-                          final stock = incoming + other - sold;
-                          return Card(child: ListTile(leading: const CircleAvatar(child: Icon(Icons.inventory_2_outlined)), title: Text(p['name']?.toString() ?? pid), subtitle: Text('Received: ${incoming.toStringAsFixed(2)}  •  Other: ${other.toStringAsFixed(2)}  •  Sold: ${sold.toStringAsFixed(2)}'), trailing: Text('${stock.toStringAsFixed(2)} Box', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))));
-                        }),
-                      ]);
-                    },
-                  ),
-                ),
-              );
-            },
-          ),
-        );
-      },
-    );
-  }
+class RetailStockPage extends StatefulWidget { const RetailStockPage({super.key}); @override State<RetailStockPage> createState()=>_RetailStockPageState(); }
+class _RetailStockPageState extends State<RetailStockPage>{
+  final db=FirebaseFirestore.instance; String? assignedShopId,selectedShopId; String selectedShopName='Retail Shop'; bool loading=true;
+  CollectionReference<Map<String,dynamic>> c(String n)=>db.collection('sharedData').doc('dailyHisab').collection(n);
+  double n(dynamic v)=>v is num?v.toDouble():double.tryParse('$v')??0;
+  @override void initState(){super.initState();_loadProfile();}
+  Future<void> _loadProfile()async{final uid=FirebaseAuth.instance.currentUser?.uid;if(uid==null)return;final s=await db.collection('users').doc(uid).get();if(!mounted)return;final d=s.data()??{};setState((){assignedShopId=d['role']=='retail_shop_user'?d['shopId']?.toString():null;selectedShopId=assignedShopId;selectedShopName=d['shopName']?.toString()??'Retail Shop';loading=false;});}
+  @override Widget build(BuildContext context){if(loading)return const Scaffold(body:Center(child:CircularProgressIndicator()));final locked=assignedShopId!=null&&assignedShopId!.isNotEmpty;return Scaffold(appBar:AppBar(title:Text('$selectedShopName Stock')),body:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:c('retailShops').snapshots(),builder:(context,shopsSnap){if(shopsSnap.hasError)return Center(child:Text('Unable to load retail shops: ${shopsSnap.error}'));if(!shopsSnap.hasData)return const Center(child:CircularProgressIndicator());final shops=shopsSnap.data!.docs.where((d)=>d.data()['active']!=false).toList();if(!locked&&selectedShopId==null&&shops.isNotEmpty){selectedShopId=shops.first.id;selectedShopName=shops.first.data()['name']?.toString()??'Retail Shop';}if(selectedShopId==null||selectedShopId!.isEmpty)return const Center(child:Text('No retail shop available.'));return Column(children:[if(!locked)Padding(padding:const EdgeInsets.fromLTRB(16,16,16,0),child:DropdownButtonFormField<String>(initialValue:shops.any((x)=>x.id==selectedShopId)?selectedShopId:null,items:shops.map((x)=>DropdownMenuItem(value:x.id,child:Text(x.data()['name']?.toString()??x.id))).toList(),onChanged:(v){if(v==null)return;final x=shops.firstWhere((s)=>s.id==v);setState((){selectedShopId=v;selectedShopName=x.data()['name']?.toString()??'Retail Shop';});},decoration:const InputDecoration(labelText:'Retail Shop',border:OutlineInputBorder()))),Expanded(child:_stock(selectedShopId!,selectedShopName))]);});}
+  Widget _stock(String shopId,String shopName)=>StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:c('products').snapshots(),builder:(context,ps){if(ps.hasError)return Center(child:Text('Unable to load products: ${ps.error}'));if(!ps.hasData)return const Center(child:CircularProgressIndicator());final products=ps.data!.docs.where((d)=>d.data()['active']!=false).toList();return StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:c('stockTransfers').where('shopId',isEqualTo:shopId).snapshots(),builder:(context,ts){return StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:c('stockOtherReceived').where('shopId',isEqualTo:shopId).snapshots(),builder:(context,rs){return StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:c('sales').where('shopId',isEqualTo:shopId).snapshots(),builder:(context,ss){if(ts.hasError||rs.hasError||ss.hasError)return Center(child:Text('Unable to load shop stock. ${ts.error??rs.error??ss.error}'));if(!ts.hasData||!rs.hasData||!ss.hasData)return const Center(child:CircularProgressIndicator());final transfers=ts.data!.docs.map((d)=>d.data()).toList(),received=rs.data!.docs.map((d)=>d.data()).toList(),sales=ss.data!.docs.map((d)=>d.data()).toList();return ListView(padding:const EdgeInsets.all(16),children:[Card(child:ListTile(leading:const CircleAvatar(child:Icon(Icons.store)),title:Text(shopName,style:const TextStyle(fontWeight:FontWeight.bold)),subtitle:const Text('Received + other received - sales'))),const SizedBox(height:12),...products.map((p){final id=p.id;final incoming=transfers.where((x)=>x['productId']?.toString()==id).fold<double>(0,(s,x)=>s+n(x['quantity']));final other=received.where((x)=>x['productId']?.toString()==id).fold<double>(0,(s,x)=>s+n(x['quantity']));final sold=sales.fold<double>(0,(s,x){final items=x['items'];if(items is! List)return s;return s+items.whereType<Map>().where((i)=>i['productId']?.toString()==id).fold<double>(0,(a,i)=>a+n(i['quantity']));});final stock=incoming+other-sold;return Card(child:ListTile(leading:const CircleAvatar(child:Icon(Icons.inventory_2_outlined)),title:Text(p.data()['name']?.toString()??id),subtitle:Text('Received: ${incoming.toStringAsFixed(2)}  •  Other: ${other.toStringAsFixed(2)}  •  Sold: ${sold.toStringAsFixed(2)}'),trailing:Text('${stock.toStringAsFixed(2)} Box',style:const TextStyle(fontWeight:FontWeight.bold,fontSize:16))));})]);});});});});}
 }
