@@ -7,64 +7,67 @@ class SalesService {
   SalesService._();
   static final instance = SalesService._();
   final FirebaseFirestore _db = FirebaseFirestore.instance;
-  CollectionReference<Map<String, dynamic>> get _sales => _db.collection('sharedData').doc('dailyHisab').collection('sales');
+  CollectionReference<Map<String, dynamic>> get _sales =>
+      _db.collection('sharedData').doc('dailyHisab').collection('sales');
 
-  double calculateGross(List<SaleItem> items) => items.fold<double>(0.0, (t, i) => t + i.amount);
-  double calculateCommission(List<SaleItem> items, double perBox) => items.fold<double>(0.0, (t, i) => t + i.quantity) * perBox;
+  double calculateGross(List<SaleItem> items) =>
+      items.fold<double>(0.0, (t, i) => t + i.amount);
+
+  double calculateCommission(List<SaleItem> items, double perBox) =>
+      items.fold<double>(0.0, (t, i) => t + i.quantity) * perBox;
+
   double calculateNet(double gross, double commission) => gross - commission;
-  double calculateOutstanding(double net, double paid) => (net - paid).clamp(0.0, double.infinity);
-  String paymentStatus(double net, double paid) => paid <= 0 ? 'Pending' : (paid >= net ? 'Paid' : 'Partial');
 
-  Future<bool> _isAdmin() async {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return false;
-    final snap = await _db.collection('users').doc(uid).get();
-    final data = snap.data() ?? <String,dynamic>{};
-    return data['role']?.toString() == 'admin' && data['status']?.toString() == 'approved';
-  }
+  double calculateOutstanding(double net, double paid) =>
+      (net - paid).clamp(0.0, double.infinity);
 
-  Future<String> addSale(Sale sale) => FirestoreService.instance.add('sales', sale.toMap());
+  String paymentStatus(double net, double paid) =>
+      paid <= 0 ? 'Pending' : (paid >= net ? 'Paid' : 'Partial');
 
+  Future<String> addSale(Sale sale) =>
+      FirestoreService.instance.add('sales', sale.toMap());
+
+  // Edit/delete approval is handled centrally by FirestoreService.
+  // Admins are updated directly; approved non-admin users create a
+  // Change Approval request instead of changing the record immediately.
   Future<void> updateSale(Sale sale) async {
-    if (await _isAdmin()) {
-      await FirestoreService.instance.update('sales', sale.id, sale.toMap());
-      return;
-    }
-    final u=FirebaseAuth.instance.currentUser;
-    if(u==null) throw StateError('Please sign in again.');
-    await _db.collection('changeRequests').add({
-      'action':'edit','collection':'sales','recordId':sale.id,'proposedData':sale.toMap(),
-      'requestedBy':u.uid,'requestedByEmail':u.email,'status':'pending','requestedAt':FieldValue.serverTimestamp(),
-    });
+    await FirestoreService.instance.update('sales', sale.id, sale.toMap());
   }
 
   Future<void> deleteSale(String id) async {
-    if (await _isAdmin()) { await FirestoreService.instance.delete('sales', id); return; }
-    final u=FirebaseAuth.instance.currentUser;
-    if(u==null) throw StateError('Please sign in again.');
-    await _db.collection('changeRequests').add({
-      'action':'delete','collection':'sales','recordId':id,'requestedBy':u.uid,'requestedByEmail':u.email,
-      'status':'pending','requestedAt':FieldValue.serverTimestamp(),
-    });
+    await FirestoreService.instance.delete('sales', id);
   }
 
   Stream<List<Sale>> watchSales() {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return const Stream.empty();
-    return Stream.fromFuture(_db.collection('users').doc(uid).get()).asyncExpand((profile) {
+
+    return Stream.fromFuture(_db.collection('users').doc(uid).get())
+        .asyncExpand((profile) {
       final data = profile.data() ?? <String, dynamic>{};
       final role = data['role']?.toString();
       final shopId = data['shopId']?.toString();
-      if (role == 'retail_shop_user' && shopId != null && shopId.isNotEmpty) return watchShopSales(shopId);
+
+      if (role == 'retail_shop_user' && shopId != null && shopId.isNotEmpty) {
+        return watchShopSales(shopId);
+      }
+
       return _sales.snapshots().map((snapshot) {
-        final sales = snapshot.docs.map((doc) => Sale.fromMap(doc.id, doc.data())).toList();
-        sales.sort((a, b) => b.date.compareTo(a.date)); return sales;
+        final sales = snapshot.docs
+            .map((doc) => Sale.fromMap(doc.id, doc.data()))
+            .toList();
+        sales.sort((a, b) => b.date.compareTo(a.date));
+        return sales;
       });
     });
   }
 
-  Stream<List<Sale>> watchShopSales(String shopId) => _sales.where('shopId', isEqualTo: shopId).snapshots().map((snapshot) {
-    final sales = snapshot.docs.map((doc) => Sale.fromMap(doc.id, doc.data())).toList();
-    sales.sort((a, b) => b.date.compareTo(a.date)); return sales;
+  Stream<List<Sale>> watchShopSales(String shopId) =>
+      _sales.where('shopId', isEqualTo: shopId).snapshots().map((snapshot) {
+    final sales = snapshot.docs
+        .map((doc) => Sale.fromMap(doc.id, doc.data()))
+        .toList();
+    sales.sort((a, b) => b.date.compareTo(a.date));
+    return sales;
   });
 }
