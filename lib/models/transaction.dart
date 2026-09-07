@@ -9,6 +9,7 @@ class HisabTransaction {
   final String partyId;
   final String partyName;
   final String description;
+  final String shopId;
 
   const HisabTransaction({
     required this.id,
@@ -19,12 +20,10 @@ class HisabTransaction {
     this.partyId = '',
     this.partyName = '',
     this.description = '',
+    this.shopId = '',
   });
 
-  factory HisabTransaction.fromMap(
-    String id,
-    Map<String, dynamic> data,
-  ) {
+  factory HisabTransaction.fromMap(String id, Map<String, dynamic> data) {
     return HisabTransaction(
       id: id,
       date: (data['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
@@ -32,45 +31,32 @@ class HisabTransaction {
       amount: (data['amount'] as num?)?.toDouble() ?? 0,
       account: data['account']?.toString() ?? 'Cash',
       partyId: data['partyId']?.toString() ?? '',
-      partyName: data['partyName']?.toString() ??
-          data['party']?.toString() ??
-          '',
-      description: data['description']?.toString() ??
-          data['note']?.toString() ??
-          '',
+      partyName: data['partyName']?.toString() ?? data['party']?.toString() ?? '',
+      description: data['description']?.toString() ?? data['note']?.toString() ?? '',
+      shopId: data['shopId']?.toString() ?? '',
     );
   }
 
-  Map<String, dynamic> toMap() {
-    return {
-      'date': Timestamp.fromDate(date),
-      'type': type,
-      'amount': amount,
-      'account': account,
-      'partyId': partyId,
-      'partyName': partyName,
-      'description': description,
-    };
-  }
+  Map<String, dynamic> toMap() => {
+    'date': Timestamp.fromDate(date),
+    'type': type,
+    'amount': amount,
+    'account': account,
+    'partyId': partyId,
+    'partyName': partyName,
+    'description': description,
+    if (shopId.isNotEmpty) 'shopId': shopId,
+  };
 
-  HisabTransaction copyWith({
-    DateTime? date,
-    String? type,
-    double? amount,
-    String? account,
-    String? partyId,
-    String? partyName,
-    String? description,
-  }) {
-    return HisabTransaction(
-      id: id,
-      date: date ?? this.date,
-      type: type ?? this.type,
-      amount: amount ?? this.amount,
-      account: account ?? this.account,
-      partyId: partyId ?? this.partyId,
-      partyName: partyName ?? this.partyName,
-      description: description ?? this.description,
-    );
-  }
+  HisabTransaction copyWith({DateTime? date, String? type, double? amount, String? account, String? partyId, String? partyName, String? description, String? shopId}) => HisabTransaction(
+    id: id,
+    date: date ?? this.date,
+    type: type ?? this.type,
+    amount: amount ?? this.amount,
+    account: account ?? this.account,
+    partyId: partyId ?? this.partyId,
+    partyName: partyName ?? this.partyName,
+    description: description ?? this.description,
+    shopId: shopId ?? this.shopId,
+  );
 }
