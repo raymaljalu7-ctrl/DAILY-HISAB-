@@ -23,17 +23,18 @@ class _ReportsV2PageState extends State<ReportsV2Page> {
   String? assignedShopName;
   String? shopId;
   String? productId;
+  String? partyId;
   String? error;
   List<Map<String, dynamic>> rows = [];
   List<Map<String, dynamic>> shops = [];
   List<Map<String, dynamic>> products = [];
+  List<Map<String, dynamic>> parties = [];
 
   List<String> get types => retailUser
       ? const ['Sales', 'Receipt', 'Payments', 'Party Ledger', 'Expenses', 'Cash Management', 'Stock Management']
       : const ['Sales', 'Receipt', 'Payments', 'Outstanding', 'Commission', 'Production', 'Expenses', 'Salary', 'Capital', 'Stock Management', 'Cash Management', 'Profit/Loss'];
 
   CollectionReference<Map<String, dynamic>> _col(String name) => db.collection('sharedData').doc('dailyHisab').collection(name);
-
   double _num(dynamic value) => value is num ? value.toDouble() : double.tryParse('$value') ?? 0;
 
   DateTime _date(dynamic value) {
@@ -52,10 +53,7 @@ class _ReportsV2PageState extends State<ReportsV2Page> {
   String _money(dynamic value) => '₹${_num(value).toStringAsFixed(2)}';
 
   @override
-  void initState() {
-    super.initState();
-    _initialize();
-  }
+  void initState() { super.initState(); _initialize(); }
 
   Future<void> _initialize() async {
     try {
@@ -65,8 +63,12 @@ class _ReportsV2PageState extends State<ReportsV2Page> {
       retailUser = user['role'] == 'retail_shop_user';
       assignedShopId = user['shopId']?.toString();
       assignedShopName = user['shopName']?.toString();
+
       final productSnapshot = await _col('products').get();
       products = productSnapshot.docs.map((d) => {'id': d.id, ...d.data()}).where((x) => x['active'] != false).toList();
+      final partySnapshot = await _col('parties').get();
+      parties = partySnapshot.docs.map((d) => {'id': d.id, ...d.data()}).where((x) => x['active'] != false).toList()
+        ..sort((a, b) => '${a['name'] ?? ''}'.toLowerCase().compareTo('${b['name'] ?? ''}'.toLowerCase()));
       if (!retailUser) {
         final shopSnapshot = await _col('retailShops').get();
         shops = shopSnapshot.docs.map((d) => {'id': d.id, ...d.data()}).where((x) => x['active'] != false).toList();
@@ -89,21 +91,10 @@ class _ReportsV2PageState extends State<ReportsV2Page> {
     final now = DateTime.now();
     DateTime start = now;
     DateTime end = now;
-    if (value == 'Monthly') {
-      start = DateTime(now.year, now.month, 1);
-      end = DateTime(now.year, now.month + 1, 0);
-    } else if (value == 'Quarterly') {
-      final month = ((now.month - 1) ~/ 3) * 3 + 1;
-      start = DateTime(now.year, month, 1);
-      end = DateTime(now.year, month + 3, 0);
-    } else if (value == '6 Monthly') {
-      final month = now.month <= 6 ? 1 : 7;
-      start = DateTime(now.year, month, 1);
-      end = DateTime(now.year, month + 6, 0);
-    } else if (value == 'Yearly') {
-      start = DateTime(now.year, 1, 1);
-      end = DateTime(now.year, 12, 31);
-    }
+    if (value == 'Monthly') { start = DateTime(now.year, now.month, 1); end = DateTime(now.year, now.month + 1, 0); }
+    else if (value == 'Quarterly') { final month = ((now.month - 1) ~/ 3) * 3 + 1; start = DateTime(now.year, month, 1); end = DateTime(now.year, month + 3, 0); }
+    else if (value == '6 Monthly') { final month = now.month <= 6 ? 1 : 7; start = DateTime(now.year, month, 1); end = DateTime(now.year, month + 6, 0); }
+    else if (value == 'Yearly') { start = DateTime(now.year, 1, 1); end = DateTime(now.year, 12, 31); }
     setState(() { period = value; from = start; to = end; });
     _load();
   }
@@ -127,9 +118,12 @@ class _ReportsV2PageState extends State<ReportsV2Page> {
         result = await _fetch('transactions', shop: assignedShopId);
         if (report == 'Receipt') result = result.where((x) => x['type'] == 'Receipt').toList();
         if (report == 'Payments') result = result.where((x) => x['type'] == 'Payment').toList();
+        if (partyId != null) result = result.where((x) => (x['partyId']?.toString() ?? '') == partyId).toList();
+        else if (partyId == null && _partyFilterNone) result = result.where((x) => (x['partyId']?.toString() ?? '').isEmpty).toList();
         if (report == 'Party Ledger') {
-          result = result.where((x) => (x['partyId']?.toString() ?? '').isNotEmpty).map((x) {
-            return {...x, 'signedAmount': x['type'] == 'Receipt' ? _num(x['amount']) : -_num(x['amount'])};
+          result = result.where((x) => (x['partyId']?.toString() ?? '').isNotEmpty).map((x) => {
+            ...x,
+            'signedAmount': x['type'] == 'Receipt' ? _num(x['amount']) : -_num(x['amount']),
           }).toList();
         }
       } else if (report == 'Expenses') {
@@ -154,6 +148,8 @@ class _ReportsV2PageState extends State<ReportsV2Page> {
       if (mounted) setState(() { error = '$e'; loading = false; });
     }
   }
+
+  bool _partyFilterNone = false;
 
   Future<List<Map<String, dynamic>>> _cash() async {
     final result = <Map<String, dynamic>>[];
@@ -194,11 +190,7 @@ class _ReportsV2PageState extends State<ReportsV2Page> {
           double sold = 0;
           for (final sale in sales.where((x) => x['shopId']?.toString() == sid)) {
             final items = sale['items'];
-            if (items is List) {
-              for (final item in items) {
-                if (item is Map && item['productId']?.toString() == id) sold += _num(item['quantity']);
-              }
-            }
+            if (items is List) for (final item in items) if (item is Map && item['productId']?.toString() == id) sold += _num(item['quantity']);
           }
           final shopName = retailUser ? (assignedShopName ?? 'Retail Shop') : (shops.firstWhere((x) => x['id'].toString() == sid, orElse: () => {'name': sid})['name'] ?? sid);
           result.add({'date': DateTime.now(), 'particular': '$shopName • ${product['name'] ?? id}', 'quantity': incoming - sold});
@@ -236,22 +228,41 @@ class _ReportsV2PageState extends State<ReportsV2Page> {
     }
     await Printing.layoutPdf(onLayout: (format) async {
       final document = pw.Document();
-      document.addPage(pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        build: (context) => [
-          pw.Text('DAILY HISAB - $report REPORT', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-          pw.Text('Period: ${_dateText(from)} to ${_dateText(to)}'),
-          pw.SizedBox(height: 10),
-          pw.TableHelper.fromTextArray(
-            headers: const ['Date', 'Particular', 'Amount'],
-            data: rows.map((row) => [_dateText(_date(row['date'])), _particular(row), _amount(row).toStringAsFixed(2)]).toList(),
-          ),
-          pw.SizedBox(height: 10),
-          pw.Text('Total: ${_total.toStringAsFixed(2)}'),
-        ],
-      ));
+      document.addPage(pw.MultiPage(pageFormat: PdfPageFormat.a4, build: (context) => [
+        pw.Text('DAILY HISAB - $report REPORT', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+        pw.Text('Period: ${_dateText(from)} to ${_dateText(to)}'),
+        pw.SizedBox(height: 10),
+        pw.TableHelper.fromTextArray(headers: const ['Date', 'Particular', 'Amount'], data: rows.map((row) => [_dateText(_date(row['date'])), _particular(row), _amount(row).toStringAsFixed(2)]).toList()),
+        pw.SizedBox(height: 10),
+        pw.Text('Total: ${_total.toStringAsFixed(2)}'),
+      ]));
       return document.save();
     });
+  }
+
+  Widget _partyFilter() {
+    final entries = <DropdownMenuItem<String>>[
+      const DropdownMenuItem(value: '__NONE__', child: Text('None')),
+      ...parties.map((x) => DropdownMenuItem(value: x['id'].toString(), child: Text(x['name']?.toString() ?? x['id'].toString()))),
+    ];
+    final value = _partyFilterNone ? '__NONE__' : (partyId ?? '');
+    if (value == '') entries.insert(0, const DropdownMenuItem(value: '', child: Text('All Parties')));
+    return Column(children: [
+      const SizedBox(height: 10),
+      DropdownButtonFormField<String>(
+        initialValue: value,
+        isExpanded: true,
+        decoration: const InputDecoration(labelText: 'Party', border: OutlineInputBorder()),
+        items: entries,
+        onChanged: (value) {
+          setState(() {
+            _partyFilterNone = value == '__NONE__';
+            partyId = (value == null || value.isEmpty || value == '__NONE__') ? null : value;
+          });
+          _load();
+        },
+      ),
+    ]);
   }
 
   @override
@@ -261,62 +272,31 @@ class _ReportsV2PageState extends State<ReportsV2Page> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          DropdownButtonFormField<String>(
-            initialValue: report,
-            decoration: const InputDecoration(labelText: 'Report', border: OutlineInputBorder()),
-            items: types.map((x) => DropdownMenuItem(value: x, child: Text(x))).toList(),
-            onChanged: (value) { if (value != null) { setState(() => report = value); _load(); } },
-          ),
+          DropdownButtonFormField<String>(initialValue: report, decoration: const InputDecoration(labelText: 'Report', border: OutlineInputBorder()), items: types.map((x) => DropdownMenuItem(value: x, child: Text(x))).toList(), onChanged: (value) { if (value != null) { setState(() { report = value; partyId = null; _partyFilterNone = false; }); _load(); } }),
           const SizedBox(height: 10),
-          DropdownButtonFormField<String>(
-            initialValue: period,
-            decoration: const InputDecoration(labelText: 'Period', border: OutlineInputBorder()),
-            items: const ['Daily', 'Monthly', 'Quarterly', '6 Monthly', 'Yearly'].map((x) => DropdownMenuItem(value: x, child: Text(x))).toList(),
-            onChanged: (value) { if (value != null) _changePeriod(value); },
-          ),
+          DropdownButtonFormField<String>(initialValue: period, decoration: const InputDecoration(labelText: 'Period', border: OutlineInputBorder()), items: const ['Daily', 'Monthly', 'Quarterly', '6 Monthly', 'Yearly'].map((x) => DropdownMenuItem(value: x, child: Text(x))).toList(), onChanged: (value) { if (value != null) _changePeriod(value); }),
           if (!retailUser && report == 'Sales') ...[
             const SizedBox(height: 10),
-            DropdownButtonFormField<String>(
-              initialValue: shopId ?? '',
-              decoration: const InputDecoration(labelText: 'Retail Shop', border: OutlineInputBorder()),
-              items: [const DropdownMenuItem(value: '', child: Text('All Shops')), ...shops.map((x) => DropdownMenuItem(value: x['id'].toString(), child: Text(x['name']?.toString() ?? x['id'].toString())))],
-              onChanged: (value) { setState(() => shopId = (value ?? '').isEmpty ? null : value); _load(); },
-            ),
+            DropdownButtonFormField<String>(initialValue: shopId ?? '', decoration: const InputDecoration(labelText: 'Retail Shop', border: OutlineInputBorder()), items: [const DropdownMenuItem(value: '', child: Text('All Shops')), ...shops.map((x) => DropdownMenuItem(value: x['id'].toString(), child: Text(x['name']?.toString() ?? x['id'].toString())))], onChanged: (value) { setState(() => shopId = (value ?? '').isEmpty ? null : value); _load(); }),
           ],
           if (report == 'Sales') ...[
             const SizedBox(height: 10),
-            DropdownButtonFormField<String>(
-              initialValue: productId ?? '',
-              decoration: const InputDecoration(labelText: 'Product', border: OutlineInputBorder()),
-              items: [const DropdownMenuItem(value: '', child: Text('All Products')), ...products.map((x) => DropdownMenuItem(value: x['id'].toString(), child: Text(x['name']?.toString() ?? x['id'].toString())))],
-              onChanged: (value) { setState(() => productId = (value ?? '').isEmpty ? null : value); _load(); },
-            ),
+            DropdownButtonFormField<String>(initialValue: productId ?? '', decoration: const InputDecoration(labelText: 'Product', border: OutlineInputBorder()), items: [const DropdownMenuItem(value: '', child: Text('All Products')), ...products.map((x) => DropdownMenuItem(value: x['id'].toString(), child: Text(x['name']?.toString() ?? x['id'].toString())))], onChanged: (value) { setState(() => productId = (value ?? '').isEmpty ? null : value); _load(); }),
           ],
+          if (report == 'Receipt' || report == 'Payments' || report == 'Party Ledger') _partyFilter(),
           if (report == 'Stock Management' && !retailUser) ...[
             const SizedBox(height: 10),
-            DropdownButtonFormField<String>(
-              initialValue: stockScope,
-              decoration: const InputDecoration(labelText: 'Stock Location', border: OutlineInputBorder()),
-              items: const ['All', 'Production Unit', 'Retail Shops'].map((x) => DropdownMenuItem(value: x, child: Text(x))).toList(),
-              onChanged: (value) { if (value != null) { setState(() => stockScope = value); _load(); } },
-            ),
+            DropdownButtonFormField<String>(initialValue: stockScope, decoration: const InputDecoration(labelText: 'Stock Location', border: OutlineInputBorder()), items: const ['All', 'Production Unit', 'Retail Shops'].map((x) => DropdownMenuItem(value: x, child: Text(x))).toList(), onChanged: (value) { if (value != null) { setState(() => stockScope = value); _load(); } }),
           ],
           const SizedBox(height: 14),
           if (error != null) Text(error!, style: const TextStyle(color: Colors.red)),
-          if (loading)
-            const Center(child: CircularProgressIndicator())
-          else if (rows.isEmpty)
-            const Padding(padding: EdgeInsets.all(24), child: Text('No data for selected period.'))
-          else
-            Card(
-              child: Column(
-                children: [
-                  ListTile(title: Text('$report Report', style: const TextStyle(fontWeight: FontWeight.bold)), trailing: Text('Total ${_money(_total)}')),
-                  const Divider(height: 1),
-                  ...rows.take(100).map((row) => ListTile(dense: true, title: Text(_particular(row)), subtitle: Text(_dateText(_date(row['date']))), trailing: Text(_money(_amount(row))))),
-                ],
-              ),
-            ),
+          if (loading) const Center(child: CircularProgressIndicator())
+          else if (rows.isEmpty) const Padding(padding: EdgeInsets.all(24), child: Text('No data for selected period.'))
+          else Card(child: Column(children: [
+            ListTile(title: Text('$report Report', style: const TextStyle(fontWeight: FontWeight.bold)), trailing: Text('Total ${_money(_total)}')),
+            const Divider(height: 1),
+            ...rows.take(100).map((row) => ListTile(dense: true, title: Text(_particular(row)), subtitle: Text(_dateText(_date(row['date']))), trailing: Text(_money(_amount(row))))),
+          ])),
         ],
       ),
     );
