@@ -26,7 +26,7 @@ service cloud.firestore {
     }
     match /sharedData/dailyHisab/parties/{partyId} {
       allow read: if isApproved();
-      allow create: if isAdmin() || (isRetailUser() && request.resource.data.get('createdBy', '') == request.auth.uid && request.resource.data.get('shopId', '') == myProfile().get('shopId', ''));
+      allow create: if isAdmin() || (isRetailUser() && request.resource.data.get('createdBy', '') == request.auth.uid);
       allow update, delete: if isAdmin();
     }
 
