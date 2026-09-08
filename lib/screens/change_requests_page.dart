@@ -8,27 +8,21 @@ class ChangeRequestsPage extends StatelessWidget {
   FirebaseFirestore get _db => FirebaseFirestore.instance;
   CollectionReference<Map<String, dynamic>> get _requests => _db.collection('changeRequests');
 
-  Map<String, dynamic> _map(dynamic value) =>
-      value is Map ? Map<String, dynamic>.from(value) : <String, dynamic>{};
+  Map<String, dynamic> _map(dynamic value) => value is Map ? Map<String, dynamic>.from(value) : <String, dynamic>{};
 
   bool _sameVersion(dynamic requestVersion, dynamic recordVersion) {
     if (requestVersion == null && recordVersion == null) return true;
     if (requestVersion is Timestamp && recordVersion is Timestamp) {
-      return requestVersion.seconds == recordVersion.seconds &&
-          requestVersion.nanoseconds == recordVersion.nanoseconds;
+      return requestVersion.seconds == recordVersion.seconds && requestVersion.nanoseconds == recordVersion.nanoseconds;
     }
     return requestVersion?.toString() == recordVersion?.toString();
   }
 
-  Future<void> _approve(
-    BuildContext context,
-    DocumentSnapshot<Map<String, dynamic>> request,
-  ) async {
+  Future<void> _approve(BuildContext context, DocumentSnapshot<Map<String, dynamic>> request) async {
     final data = request.data() ?? {};
     final action = data['action']?.toString() ?? '';
     final collection = data['collection']?.toString() ?? '';
     final recordId = data['recordId']?.toString() ?? '';
-
     if (action != 'edit' && action != 'delete') return;
     if (collection.isEmpty || recordId.isEmpty) return;
 
@@ -42,9 +36,7 @@ class ChangeRequestsPage extends StatelessWidget {
         final requestSnap = await tx.get(requestRef);
         if (!requestSnap.exists) throw StateError('Change request no longer exists.');
         final requestData = requestSnap.data() ?? {};
-        if (requestData['status']?.toString() != 'pending') {
-          throw StateError('This request has already been processed.');
-        }
+        if (requestData['status']?.toString() != 'pending') throw StateError('This request has already been processed.');
 
         final recordSnap = await tx.get(recordRef);
         final baseVersion = requestData['baseUpdatedAt'];
@@ -75,23 +67,16 @@ class ChangeRequestsPage extends StatelessWidget {
           tx.update(recordRef, proposed);
         }
 
-        tx.update(requestRef, {
-          'status': 'approved',
-          'approvedBy': admin.uid,
-          'approvedByEmail': admin.email,
-          'approvedAt': FieldValue.serverTimestamp(),
-        });
+        // Processed requests are removed from the approval queue so they cannot
+        // remain visible after approval/rejection.
+        tx.delete(requestRef);
       });
 
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(action == 'delete' ? 'Delete request approved.' : 'Edit request approved.')),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(action == 'delete' ? 'Delete request approved.' : 'Edit request approved.')));
       }
     } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Approval failed: $e')));
-      }
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Approval failed: $e')));
     }
   }
 
@@ -99,19 +84,11 @@ class ChangeRequestsPage extends StatelessWidget {
     final admin = FirebaseAuth.instance.currentUser;
     if (admin == null) return;
     try {
-      await request.reference.update({
-        'status': 'rejected',
-        'rejectedBy': admin.uid,
-        'rejectedByEmail': admin.email,
-        'rejectedAt': FieldValue.serverTimestamp(),
-      });
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Request rejected.')));
-      }
+      // A rejected request is no longer actionable, so remove it from the queue.
+      await request.reference.delete();
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Request rejected.')));
     } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Rejection failed: $e')));
-      }
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Rejection failed: $e')));
     }
   }
 
@@ -136,26 +113,21 @@ class ChangeRequestsPage extends StatelessWidget {
         builder: (context, snapshot) {
           if (snapshot.hasError) return Center(child: Text('Unable to load requests:\n${snapshot.error}'));
           if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-
           final docs = snapshot.data?.docs ?? [];
           if (docs.isEmpty) {
             return const Center(
               child: Padding(
                 padding: EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.check_circle_outline, size: 64),
-                    SizedBox(height: 12),
-                    Text('No pending change requests.', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                    SizedBox(height: 6),
-                    Text('All edit and delete requests have been processed.'),
-                  ],
-                ),
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.check_circle_outline, size: 64),
+                  SizedBox(height: 12),
+                  Text('No pending change requests.', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  SizedBox(height: 6),
+                  Text('All edit and delete requests have been processed.'),
+                ]),
               ),
             );
           }
-
           return ListView.builder(
             padding: const EdgeInsets.all(12),
             itemCount: docs.length,
@@ -170,13 +142,10 @@ class ChangeRequestsPage extends StatelessWidget {
                   leading: CircleAvatar(child: Icon(isDelete ? Icons.delete_outline : Icons.edit_outlined)),
                   title: Text(_label(data), style: const TextStyle(fontWeight: FontWeight.bold)),
                   subtitle: Text(_details(data)),
-                  trailing: Wrap(
-                    spacing: 2,
-                    children: [
-                      IconButton(tooltip: 'Approve', onPressed: () => _approve(context, doc), icon: const Icon(Icons.check_circle, color: Colors.green)),
-                      IconButton(tooltip: 'Reject', onPressed: () => _reject(context, doc), icon: const Icon(Icons.cancel_outlined, color: Colors.red)),
-                    ],
-                  ),
+                  trailing: Wrap(spacing: 2, children: [
+                    IconButton(tooltip: 'Approve', onPressed: () => _approve(context, doc), icon: const Icon(Icons.check_circle, color: Colors.green)),
+                    IconButton(tooltip: 'Reject', onPressed: () => _reject(context, doc), icon: const Icon(Icons.cancel_outlined, color: Colors.red)),
+                  ]),
                 ),
               );
             },
