@@ -3,7 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 class ReportService {
   ReportService._();
-  static final ReportService instance = ReportService._();
+  static final instance = ReportService._();
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   CollectionReference<Map<String, dynamic>> _collection(String name) => _db.collection('sharedData').doc('dailyHisab').collection(name);
@@ -51,19 +51,16 @@ class ReportService {
 
   Future<List<Map<String, dynamic>>> transactions({required DateTime from, required DateTime to, String? type, String? shopId, String? account}) async {
     final assignedShopId = await _assignedRetailShopId();
-    final effectiveShopId = assignedShopId ?? shopId;
+    if (assignedShopId != null) return <Map<String, dynamic>>[];
+    final effectiveShopId = shopId;
     final snapshot = await _collection('transactions').get();
     final rows = <Map<String, dynamic>>[];
     for (final doc in snapshot.docs) {
       final data = doc.data();
       if (!_inRange(_date(data['date']), from, to)) continue;
       final rowType = data['type']?.toString() ?? '';
-      // The Payments report must include both money received and money paid.
-      // The optional account filter remains available for dedicated cash/bank reports.
       if (type != null && type.isNotEmpty) {
-        final matchesRequested = type == 'Receipt'
-            ? (rowType == 'Receipt' || rowType == 'Payment')
-            : rowType == type;
+        final matchesRequested = type == 'Receipt' ? (rowType == 'Receipt' || rowType == 'Payment') : rowType == type;
         if (!matchesRequested) continue;
       }
       if (account != null && account.isNotEmpty && data['account']?.toString() != account) continue;
@@ -75,6 +72,7 @@ class ReportService {
   }
 
   Future<List<Map<String, dynamic>>> production({required DateTime from, required DateTime to, String? productId}) async {
+    if (await _assignedRetailShopId() != null) return <Map<String, dynamic>>[];
     final snapshot = await _collection('production').get();
     final rows = <Map<String, dynamic>>[];
     for (final doc in snapshot.docs) {
@@ -88,6 +86,7 @@ class ReportService {
   }
 
   Future<List<Map<String, dynamic>>> expenses({required DateTime from, required DateTime to, String? head}) async {
+    if (await _assignedRetailShopId() != null) return <Map<String, dynamic>>[];
     final snapshot = await _collection('productionExpenses').get();
     final rows = <Map<String, dynamic>>[];
     for (final doc in snapshot.docs) {
@@ -101,6 +100,7 @@ class ReportService {
   }
 
   Future<List<Map<String, dynamic>>> salary({required DateTime from, required DateTime to, String? workerId}) async {
+    if (await _assignedRetailShopId() != null) return <Map<String, dynamic>>[];
     final snapshot = await _collection('salary').get();
     final rows = <Map<String, dynamic>>[];
     for (final doc in snapshot.docs) {
@@ -114,6 +114,7 @@ class ReportService {
   }
 
   Future<List<Map<String, dynamic>>> capital({required DateTime from, required DateTime to}) async {
+    if (await _assignedRetailShopId() != null) return <Map<String, dynamic>>[];
     final snapshot = await _collection('capital').get();
     final rows = <Map<String, dynamic>>[];
     for (final doc in snapshot.docs) {
@@ -127,7 +128,8 @@ class ReportService {
 
   Future<List<Map<String, dynamic>>> commissions({required DateTime from, required DateTime to, String? shopId}) async {
     final assignedShopId = await _assignedRetailShopId();
-    final effectiveShopId = assignedShopId ?? shopId;
+    if (assignedShopId != null) return <Map<String, dynamic>>[];
+    final effectiveShopId = shopId;
     final snapshot = await _collection('commissions').get();
     final rows = <Map<String, dynamic>>[];
     for (final doc in snapshot.docs) {
