@@ -10,165 +10,126 @@ class RetailTransactionsPage extends StatefulWidget {
 }
 
 class _RetailTransactionsPageState extends State<RetailTransactionsPage> {
-  String transactionType = 'Receipt';
-  String paymentSubType = 'Party';
+  String type = 'Receipt';
+  String paymentFor = 'Party';
   String account = 'Cash';
-  Party? selectedParty;
-  String? selectedPartyId;
-  final amountController = TextEditingController();
-  final descriptionController = TextEditingController();
+  String partyMode = 'none'; // none, existing, new
+  String? partyId;
+  Party? party;
+  final amount = TextEditingController();
+  final description = TextEditingController();
   bool saving = false;
 
-  @override
-  void dispose() { amountController.dispose(); descriptionController.dispose(); super.dispose(); }
+  @override void dispose() { amount.dispose(); description.dispose(); super.dispose(); }
 
-  Future<void> _save(List<Party> parties) async {
-    final amount = double.tryParse(amountController.text.trim()) ?? 0;
-    if (amount <= 0) { _message('Enter an amount greater than zero.'); return; }
-    final needsParty = transactionType == 'Receipt' || paymentSubType == 'Party';
-    if (needsParty && selectedParty == null) { _message('Please select a party.'); return; }
-    if (transactionType == 'Payment' && paymentSubType == 'Expense' && descriptionController.text.trim().isEmpty) {
-      _message('Please enter the expense details.'); return;
-    }
-    setState(() => saving = true);
-    final map = <String, dynamic>{
-      'date': DateTime.now(), 'type': transactionType, 'amount': amount, 'account': account,
-      'partyId': selectedParty?.id ?? '', 'partyName': selectedParty?.name ?? '',
-      'description': descriptionController.text.trim(),
-      if (transactionType == 'Payment') 'subType': paymentSubType,
-    };
+  Future<void> _addNewParty(List<Party> parties) async {
+    final name = TextEditingController();
+    final phone = TextEditingController();
+    final address = TextEditingController();
     try {
-      await FirestoreService.instance.add('transactions', map);
+      final ok = await showDialog<bool>(context: context, builder: (c) => AlertDialog(
+        title: const Text('Add New Party'),
+        content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+          TextField(controller: name, decoration: const InputDecoration(labelText: 'Party Name')),
+          const SizedBox(height: 10), TextField(controller: phone, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Phone (optional)')),
+          const SizedBox(height: 10), TextField(controller: address, maxLines: 2, decoration: const InputDecoration(labelText: 'Address (optional)')),
+        ])),
+        actions: [TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('CANCEL')), FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('ADD'))],
+      ));
+      if (ok != true || name.text.trim().isEmpty) { if (ok == true) _message('Enter a party name.'); return; }
+      final existing = parties.where((p) => p.name.trim().toLowerCase() == name.text.trim().toLowerCase()).firstOrNull;
+      if (existing != null) { setState(() { partyMode = 'existing'; partyId = existing.id; party = existing; }); _message('Existing party selected.'); return; }
+      final id = await FirestoreService.instance.add('parties', {
+        'name': name.text.trim(), 'phone': phone.text.trim(), 'address': address.text.trim(),
+        'openingBalance': 0, 'openingType': 'Receivable', 'active': true,
+        'partyType': 'customer',
+      });
+      if (mounted) { setState(() { partyMode = 'existing'; partyId = id; party = Party(id: id, name: name.text.trim(), phone: phone.text.trim(), address: address.text.trim()); }); _message('New party added and selected.'); }
+    } catch (e) { _message('Unable to add party: $e'); }
+    name.dispose(); phone.dispose(); address.dispose();
+  }
+
+  Future<void> _save() async {
+    final value = double.tryParse(amount.text.trim()) ?? 0;
+    if (value <= 0) { _message('Enter an amount greater than zero.'); return; }
+    if (type == 'Payment' && paymentFor == 'Expense' && description.text.trim().isEmpty) { _message('Please enter the expense details.'); return; }
+    setState(() => saving = true);
+    try {
+      await FirestoreService.instance.add('transactions', {
+        'date': DateTime.now(), 'type': type, 'amount': value, 'account': account,
+        'partyId': partyMode == 'existing' ? (party?.id ?? '') : '',
+        'partyName': partyMode == 'existing' ? (party?.name ?? '') : '',
+        'description': description.text.trim(), if (type == 'Payment') 'subType': paymentFor,
+      });
       if (!mounted) return;
-      amountController.clear(); descriptionController.clear();
-      setState(() { selectedParty = null; selectedPartyId = null; saving = false; });
+      amount.clear(); description.clear(); setState(() { saving = false; partyMode = 'none'; partyId = null; party = null; });
       _message('Transaction saved successfully.');
-    } catch (error) {
-      if (!mounted) return;
-      setState(() => saving = false); _message('Unable to save transaction:\n$error');
-    }
+    } catch (e) { if (mounted) { setState(() => saving = false); _message('Unable to save transaction:\n$e'); } }
   }
 
   void _message(String text) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text))); }
 
-  Widget _balanceCard() {
-    return FutureBuilder<Map<String, double>>(
-      future: RetailCashService.instance.balances(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Card(child: Padding(padding: EdgeInsets.all(20), child: Center(child: CircularProgressIndicator())));
-        }
-        if (snapshot.hasError) {
-          return Card(child: Padding(padding: const EdgeInsets.all(16), child: Text('Unable to calculate retail balance:\n${snapshot.error}')));
-        }
-        final data = snapshot.data ?? {'Cash': 0, 'Bank': 0};
-        final cash = data['Cash'] ?? 0;
-        final bank = data['Bank'] ?? 0;
-        return Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('End-of-Day Cash / Bank Balance', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 12),
-          Row(children: [
-            Expanded(child: _balanceTile('CASH IN HAND', cash, Icons.payments_outlined)),
-            const SizedBox(width: 10),
-            Expanded(child: _balanceTile('BANK BALANCE', bank, Icons.account_balance_outlined)),
-          ]),
-          const SizedBox(height: 8),
-          Text('Total available: ₹${(cash + bank).toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 4),
-          const Text('Includes this shop\'s receipts/payments and retail sales payments.'),
-        ])));
-      },
-    );
+  Widget _partySelector(List<Party> parties) {
+    return Column(children: [
+      const SizedBox(height: 14),
+      DropdownButtonFormField<String>(
+        initialValue: partyMode,
+        items: const [
+          DropdownMenuItem(value: 'none', child: Text('None')),
+          DropdownMenuItem(value: 'existing', child: Text('Select Existing Party')),
+          DropdownMenuItem(value: 'new', child: Text('Add New Party')),
+        ],
+        onChanged: saving ? null : (v) async {
+          if (v == null) return;
+          if (v == 'new') { await _addNewParty(parties); return; }
+          setState(() { partyMode = v; if (v == 'none') { partyId = null; party = null; } });
+        },
+        decoration: const InputDecoration(labelText: 'Party', prefixIcon: Icon(Icons.person_outline), border: OutlineInputBorder()),
+      ),
+      if (partyMode == 'existing') ...[
+        const SizedBox(height: 10),
+        DropdownButtonFormField<String>(
+          initialValue: partyId,
+          isExpanded: true,
+          items: parties.map((p) => DropdownMenuItem(value: p.id, child: Text(p.name))).toList(),
+          onChanged: saving ? null : (id) { final p = parties.where((x) => x.id == id).firstOrNull; setState(() { partyId = id; party = p; }); },
+          decoration: const InputDecoration(labelText: 'Existing Party', border: OutlineInputBorder()),
+        ),
+      ],
+      if (partyMode == 'new') const SizedBox(height: 8),
+    ]);
   }
 
-  Widget _balanceTile(String title, double amount, IconData icon) => Container(
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), border: Border.all(color: Theme.of(context).colorScheme.outlineVariant)),
-    child: Column(children: [Icon(icon), const SizedBox(height: 5), Text(title, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)), const SizedBox(height: 4), Text('₹${amount.toStringAsFixed(2)}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold))]),
-  );
-
-  Widget _entryForm(List<Party> parties) {
-    final showParty = transactionType == 'Receipt' || paymentSubType == 'Party';
+  Widget _form(List<Party> parties) {
+    final showParty = type == 'Receipt' || paymentFor == 'Party';
     return Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const Text('Retail Transaction Entry', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
       const SizedBox(height: 16),
-      DropdownButtonFormField<String>(
-        initialValue: transactionType,
-        items: const [DropdownMenuItem(value: 'Receipt', child: Text('Receipt')), DropdownMenuItem(value: 'Payment', child: Text('Payment'))],
-        onChanged: saving ? null : (value) { if (value == null) return; setState(() { transactionType = value; if (value == 'Receipt') paymentSubType = 'Party'; selectedParty = null; selectedPartyId = null; }); },
-        decoration: const InputDecoration(labelText: 'Transaction', prefixIcon: Icon(Icons.swap_horiz), border: OutlineInputBorder()),
-      ),
-      if (transactionType == 'Payment') ...[
+      DropdownButtonFormField<String>(initialValue: type, items: const [DropdownMenuItem(value: 'Receipt', child: Text('Receipt')), DropdownMenuItem(value: 'Payment', child: Text('Payment'))], onChanged: saving ? null : (v) { if (v != null) setState(() { type = v; if (v == 'Receipt') paymentFor = 'Party'; }); }, decoration: const InputDecoration(labelText: 'Transaction', prefixIcon: Icon(Icons.swap_horiz), border: OutlineInputBorder())),
+      if (type == 'Payment') ...[
         const SizedBox(height: 14),
-        DropdownButtonFormField<String>(
-          initialValue: paymentSubType,
-          items: const [DropdownMenuItem(value: 'Party', child: Text('Party Payment')), DropdownMenuItem(value: 'Expense', child: Text('Expense'))],
-          onChanged: saving ? null : (value) { if (value == null) return; setState(() { paymentSubType = value; selectedParty = null; selectedPartyId = null; }); },
-          decoration: const InputDecoration(labelText: 'Payment For', prefixIcon: Icon(Icons.category_outlined), border: OutlineInputBorder()),
-        ),
+        DropdownButtonFormField<String>(initialValue: paymentFor, items: const [DropdownMenuItem(value: 'Party', child: Text('Party Payment')), DropdownMenuItem(value: 'Expense', child: Text('Expense'))], onChanged: saving ? null : (v) { if (v != null) setState(() { paymentFor = v; if (v == 'Expense') { partyMode = 'none'; party = null; partyId = null; } }); }, decoration: const InputDecoration(labelText: 'Payment For', prefixIcon: Icon(Icons.category_outlined), border: OutlineInputBorder())),
       ],
-      if (showParty) ...[
-        const SizedBox(height: 14),
-        DropdownButtonFormField<String>(
-          initialValue: selectedPartyId, isExpanded: true,
-          items: parties.map((party) => DropdownMenuItem(value: party.id, child: Text(party.name))).toList(),
-          onChanged: saving ? null : (id) { if (id == null) return; final party = parties.firstWhere((item) => item.id == id); setState(() { selectedPartyId = id; selectedParty = party; }); },
-          decoration: const InputDecoration(labelText: 'Party', prefixIcon: Icon(Icons.person_outline), border: OutlineInputBorder()),
-        ),
-      ],
+      if (showParty) _partySelector(parties),
       const SizedBox(height: 14),
-      DropdownButtonFormField<String>(
-        initialValue: account,
-        items: const [DropdownMenuItem(value: 'Cash', child: Text('Cash')), DropdownMenuItem(value: 'Bank', child: Text('Bank'))],
-        onChanged: saving ? null : (value) => setState(() => account = value ?? 'Cash'),
-        decoration: const InputDecoration(labelText: 'Account', prefixIcon: Icon(Icons.account_balance_wallet_outlined), border: OutlineInputBorder()),
-      ),
+      DropdownButtonFormField<String>(initialValue: account, items: const [DropdownMenuItem(value: 'Cash', child: Text('Cash')), DropdownMenuItem(value: 'Bank', child: Text('Bank'))], onChanged: saving ? null : (v) => setState(() => account = v ?? 'Cash'), decoration: const InputDecoration(labelText: 'Account', prefixIcon: Icon(Icons.account_balance_wallet_outlined), border: OutlineInputBorder())),
       const SizedBox(height: 14),
-      TextField(controller: amountController, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Amount', prefixText: '₹ ', prefixIcon: Icon(Icons.currency_rupee), border: OutlineInputBorder())),
+      TextField(controller: amount, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Amount', prefixText: '₹ ', prefixIcon: Icon(Icons.currency_rupee), border: OutlineInputBorder())),
       const SizedBox(height: 14),
-      TextField(controller: descriptionController, textCapitalization: TextCapitalization.sentences, maxLines: 2, decoration: InputDecoration(labelText: transactionType == 'Payment' && paymentSubType == 'Expense' ? 'Expense Details' : 'Description', prefixIcon: const Icon(Icons.notes_outlined), border: const OutlineInputBorder())),
+      TextField(controller: description, textCapitalization: TextCapitalization.sentences, maxLines: 2, decoration: InputDecoration(labelText: type == 'Payment' && paymentFor == 'Expense' ? 'Expense Details' : 'Description', prefixIcon: const Icon(Icons.notes_outlined), border: const OutlineInputBorder())),
       const SizedBox(height: 14),
-      SizedBox(width: double.infinity, height: 50, child: FilledButton.icon(onPressed: saving ? null : () => _save(parties), icon: saving ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.save), label: Text(saving ? 'SAVING...' : 'SAVE TRANSACTION'))),
-    ])));
+      SizedBox(width: double.infinity, height: 50, child: FilledButton.icon(onPressed: saving ? null : _save, icon: saving ? const SizedBox(width:18,height:18,child:CircularProgressIndicator(strokeWidth:2)) : const Icon(Icons.save), label: Text(saving ? 'SAVING...' : 'SAVE TRANSACTION'))),
+    ]));
   }
 
-  Widget _history(List<Map<String, dynamic>> rows) {
-    return Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('Recent Transactions', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-      const SizedBox(height: 8),
-      if (rows.isEmpty) const Text('No transactions found.'),
-      ...rows.reversed.take(30).map((row) {
-        final type = row['type']?.toString() ?? 'Transaction';
-        final sub = row['subType']?.toString();
-        final party = row['partyName']?.toString() ?? '';
-        final accountName = row['account']?.toString() ?? 'Cash';
-        final amount = (row['amount'] as num?)?.toDouble() ?? 0;
-        final description = row['description']?.toString() ?? '';
-        final detail = [if (sub != null && sub.isNotEmpty) sub, if (party.isNotEmpty) party, accountName, if (description.isNotEmpty) description].join(' • ');
-        return ListTile(contentPadding: EdgeInsets.zero, leading: Icon(type == 'Receipt' ? Icons.arrow_downward : Icons.arrow_upward), title: Text('$type • ₹${amount.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)), subtitle: Text(detail));
-      }),
-    ])));
-  }
+  Widget _balance() => FutureBuilder<Map<String,double>>(future: RetailCashService.instance.balances(), builder: (context, s) {
+    if (!s.hasData) return const Card(child: Padding(padding: EdgeInsets.all(20), child: Center(child: CircularProgressIndicator())));
+    final d=s.data!; final cash=d['Cash']??0, bank=d['Bank']??0;
+    return Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('End-of-Day Cash / Bank Balance', style: TextStyle(fontSize:18,fontWeight:FontWeight.bold)), const SizedBox(height:12), Row(children:[Expanded(child: _tile('CASH IN HAND',cash,Icons.payments_outlined)),const SizedBox(width:10),Expanded(child:_tile('BANK BALANCE',bank,Icons.account_balance_outlined))]), const SizedBox(height:8), Text('Total available: ₹${(cash+bank).toStringAsFixed(2)}',style:const TextStyle(fontWeight:FontWeight.bold))])));
+  });
+  Widget _tile(String t,double n,IconData i)=>Container(padding:const EdgeInsets.all(12),decoration:BoxDecoration(borderRadius:BorderRadius.circular(12),border:Border.all(color:Theme.of(context).colorScheme.outlineVariant)),child:Column(children:[Icon(i),const SizedBox(height:4),Text(t,textAlign:TextAlign.center,style:const TextStyle(fontSize:11,fontWeight:FontWeight.bold)),Text('₹${n.toStringAsFixed(2)}',style:const TextStyle(fontSize:18,fontWeight:FontWeight.bold))]));
 
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Retail Cash & Bank')),
-    body: StreamBuilder<List<Map<String, dynamic>>>(
-      stream: FirestoreService.instance.stream('parties'),
-      builder: (context, partySnapshot) {
-        if (partySnapshot.hasError) return Center(child: Text('Unable to load parties:\n${partySnapshot.error}'));
-        if (partySnapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-        final parties = (partySnapshot.data ?? []).map((data) => Party.fromMap(data['id'].toString(), data)).where((party) => party.active).toList()..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-        return StreamBuilder<List<Map<String, dynamic>>>(
-          stream: FirestoreService.instance.stream('transactions'),
-          builder: (context, transactionSnapshot) {
-            if (transactionSnapshot.hasError) return Center(child: Text('Unable to load transactions:\n${transactionSnapshot.error}'));
-            if (transactionSnapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-            final rows = transactionSnapshot.data ?? [];
-            return ListView(padding: const EdgeInsets.all(12), children: [_balanceCard(), const SizedBox(height: 12), _entryForm(parties), const SizedBox(height: 12), _history(rows)]);
-          },
-        );
-      },
-    ),
-  );
+  Widget _history(List<Map<String,dynamic>> rows)=>Card(child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[const Text('Recent Transactions',style:TextStyle(fontSize:18,fontWeight:FontWeight.bold)),...rows.reversed.take(30).map((r){final t=r['type']?.toString()??'Transaction',p=r['partyName']?.toString()??'',a=(r['amount'] as num?)?.toDouble()??0,ac=r['account']?.toString()??'Cash',d=r['description']?.toString()??'';return ListTile(contentPadding:EdgeInsets.zero,leading:Icon(t=='Receipt'?Icons.arrow_downward:Icons.arrow_upward),title:Text('$t • ₹${a.toStringAsFixed(2)}',style:const TextStyle(fontWeight:FontWeight.bold)),subtitle:Text([if(p.isNotEmpty)p,ac,if(d.isNotEmpty)d].join(' • ')));})])));
+
+  @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('Retail Cash & Bank')),body:StreamBuilder<List<Map<String,dynamic>>>(stream:FirestoreService.instance.stream('parties'),builder:(context,ps){if(ps.hasError)return Center(child:Text('Unable to load parties:\n${ps.error}'));if(!ps.hasData)return const Center(child:CircularProgressIndicator());final parties=(ps.data??[]).map((d)=>Party.fromMap(d['id'].toString(),d)).where((p)=>p.active).toList()..sort((a,b)=>a.name.toLowerCase().compareTo(b.name.toLowerCase()));return StreamBuilder<List<Map<String,dynamic>>>(stream:FirestoreService.instance.stream('transactions'),builder:(context,ts){if(ts.hasError)return Center(child:Text('Unable to load transactions:\n${ts.error}'));if(!ts.hasData)return const Center(child:CircularProgressIndicator());return ListView(padding:const EdgeInsets.all(12),children:[_balance(),const SizedBox(height:12),_form(parties),const SizedBox(height:12),_history(ts.data??[])]);});}));
 }
