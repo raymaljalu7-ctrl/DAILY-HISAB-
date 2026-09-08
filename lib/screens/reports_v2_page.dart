@@ -12,58 +12,313 @@ class ReportsV2Page extends StatefulWidget {
 
 class _ReportsV2PageState extends State<ReportsV2Page> {
   final db = FirebaseFirestore.instance;
-  String report='Sales', period='Daily', stockScope='All';
-  DateTime from=DateTime.now(), to=DateTime.now();
-  bool loading=true, retailUser=false, admin=false;
-  String? assignedShopId, assignedShopName, shopId, productId, error;
-  List<Map<String,dynamic>> rows=[], shops=[], products=[];
+  String report = 'Sales';
+  String period = 'Daily';
+  String stockScope = 'All';
+  DateTime from = DateTime.now();
+  DateTime to = DateTime.now();
+  bool loading = true;
+  bool retailUser = false;
+  String? assignedShopId;
+  String? assignedShopName;
+  String? shopId;
+  String? productId;
+  String? error;
+  List<Map<String, dynamic>> rows = [];
+  List<Map<String, dynamic>> shops = [];
+  List<Map<String, dynamic>> products = [];
 
   List<String> get types => retailUser
-      ? const ['Sales','Receipt','Payments','Party Ledger','Expenses','Cash Management','Stock Management']
-      : const ['Sales','Receipt','Payments','Outstanding','Commission','Production','Expenses','Salary','Capital','Stock Management','Cash Management','Profit/Loss'];
-  CollectionReference<Map<String,dynamic>> col(String n) => db.collection('sharedData').doc('dailyHisab').collection(n);
-  double numVal(dynamic v) => v is num ? v.toDouble() : double.tryParse('$v') ?? 0;
-  DateTime dateVal(dynamic v) { if(v is Timestamp)return v.toDate(); if(v is DateTime)return v; return DateTime.tryParse('$v') ?? DateTime.fromMillisecondsSinceEpoch(0); }
-  bool inRange(DateTime d) { final s=DateTime(from.year,from.month,from.day), e=DateTime(to.year,to.month,to.day,23,59,59); return !d.isBefore(s)&&!d.isAfter(e); }
-  String dateText(DateTime d)=>'${d.day.toString().padLeft(2,'0')}-${d.month.toString().padLeft(2,'0')}-${d.year}';
-  String money(dynamic v)=>'₹${numVal(v).toStringAsFixed(2)}';
+      ? const ['Sales', 'Receipt', 'Payments', 'Party Ledger', 'Expenses', 'Cash Management', 'Stock Management']
+      : const ['Sales', 'Receipt', 'Payments', 'Outstanding', 'Commission', 'Production', 'Expenses', 'Salary', 'Capital', 'Stock Management', 'Cash Management', 'Profit/Loss'];
 
-  @override void initState(){super.initState();_initialize();}
+  CollectionReference<Map<String, dynamic>> _col(String name) => db.collection('sharedData').doc('dailyHisab').collection(name);
+
+  double _num(dynamic value) => value is num ? value.toDouble() : double.tryParse('$value') ?? 0;
+
+  DateTime _date(dynamic value) {
+    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
+    return DateTime.tryParse('$value') ?? DateTime.fromMillisecondsSinceEpoch(0);
+  }
+
+  bool _inRange(DateTime date) {
+    final start = DateTime(from.year, from.month, from.day);
+    final end = DateTime(to.year, to.month, to.day, 23, 59, 59);
+    return !date.isBefore(start) && !date.isAfter(end);
+  }
+
+  String _dateText(DateTime date) => '${date.day.toString().padLeft(2, '0')}-${date.month.toString().padLeft(2, '0')}-${date.year}';
+  String _money(dynamic value) => '₹${_num(value).toStringAsFixed(2)}';
+
+  @override
+  void initState() {
+    super.initState();
+    _initialize();
+  }
+
   Future<void> _initialize() async {
     try {
-      final uid=FirebaseAuth.instance.currentUser?.uid; if(uid==null) throw StateError('Please login again.');
-      final u=(await db.collection('users').doc(uid).get()).data()??{};
-      retailUser=u['role']=='retail_shop_user'; admin=u['role']=='admin'; assignedShopId=u['shopId']?.toString(); assignedShopName=u['shopName']?.toString();
-      final ps=await col('products').get(); products=ps.docs.map((d)=>{'id':d.id,...d.data()}).where((x)=>x['active']!=false).toList();
-      if(!retailUser){final ss=await col('retailShops').get();shops=ss.docs.map((d)=>{'id':d.id,...d.data()}).where((x)=>x['active']!=false).toList();}
-      if(!types.contains(report))report=types.first; await _load();
-    }catch(e){if(mounted)setState(()=>{error='$e';loading=false;});}
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) throw StateError('Please login again.');
+      final user = (await db.collection('users').doc(uid).get()).data() ?? {};
+      retailUser = user['role'] == 'retail_shop_user';
+      assignedShopId = user['shopId']?.toString();
+      assignedShopName = user['shopName']?.toString();
+      final productSnapshot = await _col('products').get();
+      products = productSnapshot.docs.map((d) => {'id': d.id, ...d.data()}).where((x) => x['active'] != false).toList();
+      if (!retailUser) {
+        final shopSnapshot = await _col('retailShops').get();
+        shops = shopSnapshot.docs.map((d) => {'id': d.id, ...d.data()}).where((x) => x['active'] != false).toList();
+      }
+      if (!types.contains(report)) report = types.first;
+      await _load();
+    } catch (e) {
+      if (mounted) setState(() { error = '$e'; loading = false; });
+    }
   }
-  Future<List<Map<String,dynamic>>> fetch(String name,{String? shop}) async {
-    Query<Map<String,dynamic>> q=col(name); if(retailUser&&shop!=null&&shop.isNotEmpty)q=q.where('shopId',isEqualTo:shop);
-    final s=await q.get(); return s.docs.map((d)=>{'id':d.id,...d.data()}).where((x)=>inRange(dateVal(x['date']))).toList();
+
+  Future<List<Map<String, dynamic>>> _fetch(String name, {String? shop}) async {
+    Query<Map<String, dynamic>> query = _col(name);
+    if (retailUser && shop != null && shop.isNotEmpty) query = query.where('shopId', isEqualTo: shop);
+    final snapshot = await query.get();
+    return snapshot.docs.map((d) => {'id': d.id, ...d.data()}).where((x) => _inRange(_date(x['date']))).toList();
   }
-  void changePeriod(String v){final n=DateTime.now();DateTime s=n,e=n;if(v=='Monthly'){s=DateTime(n.year,n.month,1);e=DateTime(n.year,n.month+1,0);}else if(v=='Quarterly'){final m=((n.month-1)~/3)*3+1;s=DateTime(n.year,m,1);e=DateTime(n.year,m+3,0);}else if(v=='6 Monthly'){final m=n.month<=6?1:7;s=DateTime(n.year,m,1);e=DateTime(n.year,m+6,0);}else if(v=='Yearly'){s=DateTime(n.year,1,1);e=DateTime(n.year,12,31);}setState(()=>{period=v;from=s;to=e;});_load();}
+
+  void _changePeriod(String value) {
+    final now = DateTime.now();
+    DateTime start = now;
+    DateTime end = now;
+    if (value == 'Monthly') {
+      start = DateTime(now.year, now.month, 1);
+      end = DateTime(now.year, now.month + 1, 0);
+    } else if (value == 'Quarterly') {
+      final month = ((now.month - 1) ~/ 3) * 3 + 1;
+      start = DateTime(now.year, month, 1);
+      end = DateTime(now.year, month + 3, 0);
+    } else if (value == '6 Monthly') {
+      final month = now.month <= 6 ? 1 : 7;
+      start = DateTime(now.year, month, 1);
+      end = DateTime(now.year, month + 6, 0);
+    } else if (value == 'Yearly') {
+      start = DateTime(now.year, 1, 1);
+      end = DateTime(now.year, 12, 31);
+    }
+    setState(() { period = value; from = start; to = end; });
+    _load();
+  }
+
   Future<void> _load() async {
-    if(!mounted)return;setState(()=>{loading=true;error=null;});
-    try{
-      List<Map<String,dynamic>> r=[];
-      if(report=='Sales'||report=='Outstanding'||report=='Commission'){
-        r=await fetch('sales',shop:assignedShopId);
-        if(!retailUser&&shopId!=null&&shopId!.isNotEmpty)r=r.where((x)=>x['shopId']?.toString()==shopId).toList();
-        if(productId!=null&&productId!.isNotEmpty)r=r.where((x){final it=x['items'];return it is List&&it.any((i)=>i is Map&&i['productId']?.toString()==productId);}).toList();
-        if(report=='Outstanding')r=r.where((x)=>numVal(x['outstanding'])>0).toList();
-      }else if(report=='Receipt'||report=='Payments'||report=='Party Ledger'){
-        r=await fetch('transactions',shop:assignedShopId);if(report=='Receipt')r=r.where((x)=>x['type']=='Receipt').toList();if(report=='Payments')r=r.where((x)=>x['type']=='Payment').toList();if(report=='Party Ledger')r=r.where((x)=>(x['partyId']?.toString()??'').isNotEmpty).map((x)=>{...x,'signedAmount':x['type']=='Receipt'?numVal(x['amount']):-numVal(x['amount'])}).toList();
-      }else if(report=='Expenses'){r=retailUser?await fetch('transactions',shop:assignedShopId):await fetch('productionExpenses');if(retailUser)r=r.where((x)=>x['type']=='Payment'&&x['subType']=='Expense').toList();}
-      else if(report=='Production')r=await fetch('production');else if(report=='Salary')r=await fetch('salary');else if(report=='Capital')r=await fetch('capital');else if(report=='Cash Management')r=await _cash();else if(report=='Stock Management')r=await _stock();else if(report=='Profit/Loss')r=await _profit();
-      r.sort((a,b)=>dateVal(b['date']).compareTo(dateVal(a['date'])));if(mounted)setState(()=>{rows=r;loading=false;});
-    }catch(e){if(mounted)setState(()=>{error='$e';loading=false;});}
+    if (!mounted) return;
+    setState(() { loading = true; error = null; });
+    try {
+      List<Map<String, dynamic>> result = [];
+      if (report == 'Sales' || report == 'Outstanding' || report == 'Commission') {
+        result = await _fetch('sales', shop: assignedShopId);
+        if (!retailUser && shopId != null && shopId!.isNotEmpty) result = result.where((x) => x['shopId']?.toString() == shopId).toList();
+        if (productId != null && productId!.isNotEmpty) {
+          result = result.where((x) {
+            final items = x['items'];
+            return items is List && items.any((item) => item is Map && item['productId']?.toString() == productId);
+          }).toList();
+        }
+        if (report == 'Outstanding') result = result.where((x) => _num(x['outstanding']) > 0).toList();
+      } else if (report == 'Receipt' || report == 'Payments' || report == 'Party Ledger') {
+        result = await _fetch('transactions', shop: assignedShopId);
+        if (report == 'Receipt') result = result.where((x) => x['type'] == 'Receipt').toList();
+        if (report == 'Payments') result = result.where((x) => x['type'] == 'Payment').toList();
+        if (report == 'Party Ledger') {
+          result = result.where((x) => (x['partyId']?.toString() ?? '').isNotEmpty).map((x) {
+            return {...x, 'signedAmount': x['type'] == 'Receipt' ? _num(x['amount']) : -_num(x['amount'])};
+          }).toList();
+        }
+      } else if (report == 'Expenses') {
+        result = retailUser ? await _fetch('transactions', shop: assignedShopId) : await _fetch('productionExpenses');
+        if (retailUser) result = result.where((x) => x['type'] == 'Payment' && x['subType'] == 'Expense').toList();
+      } else if (report == 'Production') {
+        result = await _fetch('production');
+      } else if (report == 'Salary') {
+        result = await _fetch('salary');
+      } else if (report == 'Capital') {
+        result = await _fetch('capital');
+      } else if (report == 'Cash Management') {
+        result = await _cash();
+      } else if (report == 'Stock Management') {
+        result = await _stock();
+      } else if (report == 'Profit/Loss') {
+        result = await _profit();
+      }
+      result.sort((a, b) => _date(b['date']).compareTo(_date(a['date'])));
+      if (mounted) setState(() { rows = result; loading = false; });
+    } catch (e) {
+      if (mounted) setState(() { error = '$e'; loading = false; });
+    }
   }
-  Future<List<Map<String,dynamic>>> _cash() async {final r=<Map<String,dynamic>>[];final t=await fetch('transactions',shop:assignedShopId);final s=await fetch('sales',shop:assignedShopId);for(final x in t){final a=numVal(x['amount']),type=x['type']?.toString()??'';final sign=type=='Receipt'?1:type=='Payment'?-1:0;r.add({'date':x['date'],'particular':'$type • ${x['partyName']??x['description']??''}','amount':a,'signedAmount':a*sign});}for(final x in s){final a=numVal(x['paymentReceived']);if(a>0)r.add({'date':x['date'],'particular':'Sales • ${x['shopName']??assignedShopName??''}','amount':a,'signedAmount':a});}return r;}
-  Future<List<Map<String,dynamic>>> _stock() async {final r=<Map<String,dynamic>>[];final t=await fetch('stockTransfers',shop:assignedShopId);final s=await fetch('sales',shop:assignedShopId);final p=retailUser?<Map<String,dynamic>>[]:await fetch('production');if(!retailUser&&(stockScope=='All'||stockScope=='Production Unit'))for(final x in products){final id=x['id'].toString();final made=p.where((z)=>z['productId']?.toString()==id).fold<double>(0,(a,z)=>a+numVal(z['quantity']));final moved=t.where((z)=>z['productId']?.toString()==id).fold<double>(0,(a,z)=>a+numVal(z['quantity']));r.add({'date':DateTime.now(),'particular':'Production Unit • ${x['name']??id}','quantity':made-moved});}if(stockScope=='All'||stockScope=='Retail Shops'){final ids=retailUser?[assignedShopId??'']:shops.map((x)=>x['id'].toString()).toList();for(final sid in ids){for(final x in products){final id=x['id'].toString();final incoming=t.where((z)=>z['shopId']?.toString()==sid&&z['productId']?.toString()==id).fold<double>(0,(a,z)=>a+numVal(z['quantity']));double sold=0;for(final sale in s.where((z)=>z['shopId']?.toString()==sid)){final items=sale['items'];if(items is List)for(final i in items){if(i is Map&&i['productId']?.toString()==id)sold+=numVal(i['quantity']);}}final shop=retailUser?(assignedShopName??'Retail Shop'):(shops.firstWhere((z)=>z['id'].toString()==sid,orElse:()=>{'name':sid})['name']??sid);r.add({'date':DateTime.now(),'particular':'$shop • ${x['name']??id}','quantity':incoming-sold});}}}return r;}
-  Future<List<Map<String,dynamic>>> _profit() async {final s=await fetch('sales'),e=await fetch('productionExpenses'),w=await fetch('salary');final gross=s.fold<double>(0,(a,x)=>a+numVal(x['grossAmount'])),comm=s.fold<double>(0,(a,x)=>a+numVal(x['commission'])),exp=e.fold<double>(0,(a,x)=>a+numVal(x['amount'])),sal=w.fold<double>(0,(a,x)=>a+numVal(x['amount']));return [{'date':DateTime.now(),'particular':'Gross Sales','amount':gross},{'date':DateTime.now(),'particular':'Commission','amount':comm},{'date':DateTime.now(),'particular':'Expenses','amount':exp},{'date':DateTime.now(),'particular':'Salary','amount':sal},{'date':DateTime.now(),'particular':'Profit / Loss','amount':gross-comm-exp-sal}];}
-  String particular(Map<String,dynamic>x)=>'${x['particular']??x['partyName']??x['productName']??x['workerName']??x['type']??''}';double amount(Map<String,dynamic>x)=>numVal(x['signedAmount']??x['amount']??x['grossAmount']??x['netAmount']??x['quantity']);double get total=>rows.fold<double>(0,(a,x)=>a+amount(x));
-  Future<void> exportPdf() async {if(rows.isEmpty){if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('No report data to export.')));return;}await Printing.layoutPdf(onLayout:(format)async{final d=pw.Document();d.addPage(pw.MultiPage(pageFormat:PdfPageFormat.a4,build:(_)=>[pw.Text('DAILY HISAB - $report REPORT',style:pw.TextStyle(fontSize:18,fontWeight:pw.FontWeight.bold)),pw.Text('Period: ${dateText(from)} to ${dateText(to)}'),pw.SizedBox(height:10),pw.TableHelper.fromTextArray(headers:const ['Date','Particular','Amount'],data:rows.map((x)=>[dateText(dateVal(x['date'])),particular(x),amount(x).toStringAsFixed(2)]).toList()),pw.Text('Total: ${total.toStringAsFixed(2)}')]));return d.save();});}
-  @override Widget build(BuildContext context){return Scaffold(appBar:AppBar(title:const Text('Reports'),actions:[IconButton(onPressed:loading?null:exportPdf,icon:const Icon(Icons.picture_as_pdf))]),body:ListView(padding:const EdgeInsets.all(16),children:[DropdownButtonFormField<String>(initialValue:report,decoration:const InputDecoration(labelText:'Report',border:OutlineInputBorder()),items:types.map((x)=>DropdownMenuItem(value:x,child:Text(x))).toList(),onChanged:(v){if(v!=null){setState(()=>report=v);_load();}}),const SizedBox(height:10),DropdownButtonFormField<String>(initialValue:period,decoration:const InputDecoration(labelText:'Period',border:OutlineInputBorder()),items:const ['Daily','Monthly','Quarterly','6 Monthly','Yearly'].map((x)=>DropdownMenuItem(value:x,child:Text(x))).toList(),onChanged:(v){if(v!=null)changePeriod(v);}),if(!retailUser&&report=='Sales')...[const SizedBox(height:10),DropdownButtonFormField<String>(initialValue:shopId??'',decoration:const InputDecoration(labelText:'Retail Shop',border:OutlineInputBorder()),items:[const DropdownMenuItem(value:'',child:Text('All Shops')),...shops.map((x)=>DropdownMenuItem(value:x['id'].toString(),child:Text(x['name']?.toString()??x['id'].toString())))],onChanged:(v){setState(()=>shopId=(v??'').isEmpty?null:v);_load();})],if(report=='Sales')...[const SizedBox(height:10),DropdownButtonFormField<String>(initialValue:productId??'',decoration:const InputDecoration(labelText:'Product',border:OutlineInputBorder()),items:[const DropdownMenuItem(value:'',child:Text('All Products')),...products.map((x)=>DropdownMenuItem(value:x['id'].toString(),child:Text(x['name']?.toString()??x['id'].toString())))],onChanged:(v){setState(()=>productId=(v??'').isEmpty?null:v);_load();})],if(report=='Stock Management'&&!retailUser)...[const SizedBox(height:10),DropdownButtonFormField<String>(initialValue:stockScope,decoration:const InputDecoration(labelText:'Stock Location',border:OutlineInputBorder()),items:const ['All','Production Unit','Retail Shops'].map((x)=>DropdownMenuItem(value:x,child:Text(x))).toList(),onChanged:(v){if(v!=null){setState(()=>stockScope=v);_load();}})],const SizedBox(height:14),if(error!=null)Text(error!,style:const TextStyle(color:Colors.red)),if(loading)const Center(child:CircularProgressIndicator())else if(rows.isEmpty)const Padding(padding:EdgeInsets.all(24),child:Text('No data for selected period.'))else Card(child:Column(children:[ListTile(title:Text('$report Report',style:const TextStyle(fontWeight:FontWeight.bold)),trailing:Text('Total ${money(total)}')),const Divider(height:1),...rows.take(100).map((x)=>ListTile(dense:true,title:Text(particular(x)),subtitle:Text(dateText(dateVal(x['date']))),trailing:Text(money(amount(x)))))]))]) );}
+
+  Future<List<Map<String, dynamic>>> _cash() async {
+    final result = <Map<String, dynamic>>[];
+    final transactions = await _fetch('transactions', shop: assignedShopId);
+    final sales = await _fetch('sales', shop: assignedShopId);
+    for (final row in transactions) {
+      final value = _num(row['amount']);
+      final type = row['type']?.toString() ?? '';
+      final sign = type == 'Receipt' ? 1 : type == 'Payment' ? -1 : 0;
+      result.add({'date': row['date'], 'particular': '$type • ${row['partyName'] ?? row['description'] ?? ''}', 'amount': value, 'signedAmount': value * sign});
+    }
+    for (final row in sales) {
+      final value = _num(row['paymentReceived']);
+      if (value > 0) result.add({'date': row['date'], 'particular': 'Sales • ${row['shopName'] ?? assignedShopName ?? ''}', 'amount': value, 'signedAmount': value});
+    }
+    return result;
+  }
+
+  Future<List<Map<String, dynamic>>> _stock() async {
+    final result = <Map<String, dynamic>>[];
+    final transfers = await _fetch('stockTransfers', shop: assignedShopId);
+    final sales = await _fetch('sales', shop: assignedShopId);
+    if (!retailUser && (stockScope == 'All' || stockScope == 'Production Unit')) {
+      final production = await _fetch('production');
+      for (final product in products) {
+        final id = product['id'].toString();
+        final made = production.where((x) => x['productId']?.toString() == id).fold<double>(0, (sum, x) => sum + _num(x['quantity']));
+        final moved = transfers.where((x) => x['productId']?.toString() == id).fold<double>(0, (sum, x) => sum + _num(x['quantity']));
+        result.add({'date': DateTime.now(), 'particular': 'Production Unit • ${product['name'] ?? id}', 'quantity': made - moved});
+      }
+    }
+    if (stockScope == 'All' || stockScope == 'Retail Shops') {
+      final ids = retailUser ? [assignedShopId ?? ''] : shops.map((x) => x['id'].toString()).toList();
+      for (final sid in ids) {
+        for (final product in products) {
+          final id = product['id'].toString();
+          final incoming = transfers.where((x) => x['shopId']?.toString() == sid && x['productId']?.toString() == id).fold<double>(0, (sum, x) => sum + _num(x['quantity']));
+          double sold = 0;
+          for (final sale in sales.where((x) => x['shopId']?.toString() == sid)) {
+            final items = sale['items'];
+            if (items is List) {
+              for (final item in items) {
+                if (item is Map && item['productId']?.toString() == id) sold += _num(item['quantity']);
+              }
+            }
+          }
+          final shopName = retailUser ? (assignedShopName ?? 'Retail Shop') : (shops.firstWhere((x) => x['id'].toString() == sid, orElse: () => {'name': sid})['name'] ?? sid);
+          result.add({'date': DateTime.now(), 'particular': '$shopName • ${product['name'] ?? id}', 'quantity': incoming - sold});
+        }
+      }
+    }
+    return result;
+  }
+
+  Future<List<Map<String, dynamic>>> _profit() async {
+    final sales = await _fetch('sales');
+    final expenses = await _fetch('productionExpenses');
+    final salaries = await _fetch('salary');
+    final gross = sales.fold<double>(0, (sum, x) => sum + _num(x['grossAmount']));
+    final commission = sales.fold<double>(0, (sum, x) => sum + _num(x['commission']));
+    final expense = expenses.fold<double>(0, (sum, x) => sum + _num(x['amount']));
+    final salary = salaries.fold<double>(0, (sum, x) => sum + _num(x['amount']));
+    return [
+      {'date': DateTime.now(), 'particular': 'Gross Sales', 'amount': gross},
+      {'date': DateTime.now(), 'particular': 'Commission', 'amount': commission},
+      {'date': DateTime.now(), 'particular': 'Expenses', 'amount': expense},
+      {'date': DateTime.now(), 'particular': 'Salary', 'amount': salary},
+      {'date': DateTime.now(), 'particular': 'Profit / Loss', 'amount': gross - commission - expense - salary},
+    ];
+  }
+
+  String _particular(Map<String, dynamic> row) => '${row['particular'] ?? row['partyName'] ?? row['productName'] ?? row['workerName'] ?? row['type'] ?? ''}';
+  double _amount(Map<String, dynamic> row) => _num(row['signedAmount'] ?? row['amount'] ?? row['grossAmount'] ?? row['netAmount'] ?? row['quantity']);
+  double get _total => rows.fold<double>(0, (sum, row) => sum + _amount(row));
+
+  Future<void> _exportPdf() async {
+    if (rows.isEmpty) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No report data to export.')));
+      return;
+    }
+    await Printing.layoutPdf(onLayout: (format) async {
+      final document = pw.Document();
+      document.addPage(pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        build: (context) => [
+          pw.Text('DAILY HISAB - $report REPORT', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+          pw.Text('Period: ${_dateText(from)} to ${_dateText(to)}'),
+          pw.SizedBox(height: 10),
+          pw.TableHelper.fromTextArray(
+            headers: const ['Date', 'Particular', 'Amount'],
+            data: rows.map((row) => [_dateText(_date(row['date'])), _particular(row), _amount(row).toStringAsFixed(2)]).toList(),
+          ),
+          pw.SizedBox(height: 10),
+          pw.Text('Total: ${_total.toStringAsFixed(2)}'),
+        ],
+      ));
+      return document.save();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Reports'), actions: [IconButton(onPressed: loading ? null : _exportPdf, icon: const Icon(Icons.picture_as_pdf))]),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          DropdownButtonFormField<String>(
+            initialValue: report,
+            decoration: const InputDecoration(labelText: 'Report', border: OutlineInputBorder()),
+            items: types.map((x) => DropdownMenuItem(value: x, child: Text(x))).toList(),
+            onChanged: (value) { if (value != null) { setState(() => report = value); _load(); } },
+          ),
+          const SizedBox(height: 10),
+          DropdownButtonFormField<String>(
+            initialValue: period,
+            decoration: const InputDecoration(labelText: 'Period', border: OutlineInputBorder()),
+            items: const ['Daily', 'Monthly', 'Quarterly', '6 Monthly', 'Yearly'].map((x) => DropdownMenuItem(value: x, child: Text(x))).toList(),
+            onChanged: (value) { if (value != null) _changePeriod(value); },
+          ),
+          if (!retailUser && report == 'Sales') ...[
+            const SizedBox(height: 10),
+            DropdownButtonFormField<String>(
+              initialValue: shopId ?? '',
+              decoration: const InputDecoration(labelText: 'Retail Shop', border: OutlineInputBorder()),
+              items: [const DropdownMenuItem(value: '', child: Text('All Shops')), ...shops.map((x) => DropdownMenuItem(value: x['id'].toString(), child: Text(x['name']?.toString() ?? x['id'].toString())))],
+              onChanged: (value) { setState(() => shopId = (value ?? '').isEmpty ? null : value); _load(); },
+            ),
+          ],
+          if (report == 'Sales') ...[
+            const SizedBox(height: 10),
+            DropdownButtonFormField<String>(
+              initialValue: productId ?? '',
+              decoration: const InputDecoration(labelText: 'Product', border: OutlineInputBorder()),
+              items: [const DropdownMenuItem(value: '', child: Text('All Products')), ...products.map((x) => DropdownMenuItem(value: x['id'].toString(), child: Text(x['name']?.toString() ?? x['id'].toString())))],
+              onChanged: (value) { setState(() => productId = (value ?? '').isEmpty ? null : value); _load(); },
+            ),
+          ],
+          if (report == 'Stock Management' && !retailUser) ...[
+            const SizedBox(height: 10),
+            DropdownButtonFormField<String>(
+              initialValue: stockScope,
+              decoration: const InputDecoration(labelText: 'Stock Location', border: OutlineInputBorder()),
+              items: const ['All', 'Production Unit', 'Retail Shops'].map((x) => DropdownMenuItem(value: x, child: Text(x))).toList(),
+              onChanged: (value) { if (value != null) { setState(() => stockScope = value); _load(); } },
+            ),
+          ],
+          const SizedBox(height: 14),
+          if (error != null) Text(error!, style: const TextStyle(color: Colors.red)),
+          if (loading)
+            const Center(child: CircularProgressIndicator())
+          else if (rows.isEmpty)
+            const Padding(padding: EdgeInsets.all(24), child: Text('No data for selected period.'))
+          else
+            Card(
+              child: Column(
+                children: [
+                  ListTile(title: Text('$report Report', style: const TextStyle(fontWeight: FontWeight.bold)), trailing: Text('Total ${_money(_total)}')),
+                  const Divider(height: 1),
+                  ...rows.take(100).map((row) => ListTile(dense: true, title: Text(_particular(row)), subtitle: Text(_dateText(_date(row['date']))), trailing: Text(_money(_amount(row))))),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }
