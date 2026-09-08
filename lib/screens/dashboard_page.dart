@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../services/dashboard_service.dart';
@@ -6,7 +7,7 @@ class DashboardPage extends StatefulWidget { const DashboardPage({super.key}); @
 class _DashboardPageState extends State<DashboardPage>{
   DateTime fromDate=DateTime.now(),toDate=DateTime.now(); String filterType='Date'; DashboardSummary? summary; bool loading=true; String? errorMessage; bool hideProfit=true;
   @override void initState(){super.initState();_loadRole();_loadDashboard();}
-  Future<void> _loadRole()async{final uid=FirebaseAuth.instance.currentUser?.uid;if(uid==null)return;final p=(await FirebaseAuth.instance.collection('users').doc(uid).get()).data()??{};if(mounted)setState(()=>hideProfit=p['role']!='admin');}
+  Future<void> _loadRole()async{final uid=FirebaseAuth.instance.currentUser?.uid;if(uid==null)return;final p=(await FirebaseFirestore.instance.collection('users').doc(uid).get()).data()??{};if(mounted)setState(()=>hideProfit=p['role']!='admin');}
   String _money(double v)=>'₹${v.toStringAsFixed(2)}'; String _dateText(DateTime d)=>'${d.day.toString().padLeft(2,'0')}-${d.month.toString().padLeft(2,'0')}-${d.year}';
   Future<void> _loadDashboard()async{if(mounted)setState((){loading=true;errorMessage=null;});try{final r=await DashboardService.instance.calculate(from:fromDate,to:DateTime(toDate.year,toDate.month,toDate.day,23,59,59));if(mounted)setState(()=>summary=r);}catch(e){if(mounted)setState(()=>errorMessage=e.toString());}finally{if(mounted)setState(()=>loading=false);}}
   Future<void> _pickDate()async{final p=await showDatePicker(context:context,initialDate:fromDate,firstDate:DateTime(2020),lastDate:DateTime(2100));if(p==null)return;setState((){fromDate=p;toDate=p;});await _loadDashboard();}
