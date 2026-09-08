@@ -26,8 +26,10 @@ service cloud.firestore {
     }
     match /sharedData/dailyHisab/parties/{partyId} {
       allow read: if isApproved();
-      allow create, update, delete: if isAdmin();
+      allow create: if isAdmin() || (isRetailUser() && request.resource.data.get('createdBy', '') == request.auth.uid && request.resource.data.get('shopId', '') == myProfile().get('shopId', ''));
+      allow update, delete: if isAdmin();
     }
+
     match /sharedData/dailyHisab/{document=**} {
       allow read: if isApproved() && (isAdmin() || !isRetailUser() || resource.data.get('shopId', '') == myProfile().get('shopId', '') || resource.data.get('retailShopId', '') == myProfile().get('shopId', ''));
       allow create: if isApproved() && request.resource.data.get('createdBy', '') == request.auth.uid && request.resource.data.get('deletionRequested', false) == false && (!isRetailUser() || newOwnShop());
@@ -37,13 +39,12 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // Change Approvals: admins must be able to read and remove requests.
-    // Keep these permissions independent of the admin profile status field.
+    // Change Approvals are Admin-only. Explicit get/list rules make the query path unambiguous.
     match /changeRequests/{requestId} {
       allow create: if isApproved() && request.resource.data.get('requestedBy', '') == request.auth.uid && request.resource.data.get('status', '') == 'pending' && request.resource.data.get('action', '') in ['edit', 'delete'];
-      allow read: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow get: if signedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'admin';
+      allow list: if signedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'admin';
+      allow update, delete: if signedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'admin';
     }
 
     match /deletionRequests/{requestId} {
