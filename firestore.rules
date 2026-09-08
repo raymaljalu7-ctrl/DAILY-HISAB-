@@ -5,8 +5,8 @@ service cloud.firestore {
     function signedIn() { return request.auth != null; }
     function myUid() { return request.auth.uid; }
     function myProfile() { return get(/databases/$(database)/documents/users/$(myUid())).data; }
-    function isAdmin() { return signedIn() && myProfile().get('role', '') == 'admin' && myProfile().get('status', 'approved') == 'approved'; }
-    function isApproved() { return signedIn() && (myProfile().get('role', '') == 'admin' || myProfile().get('status', '') == 'approved'); }
+    function isAdmin() { return signedIn() && myProfile().get('role', '') == 'admin'; }
+    function isApproved() { return signedIn() && (isAdmin() || myProfile().get('status', '') == 'approved'); }
     function isRetailUser() { return isApproved() && myProfile().get('role', '') == 'retail_shop_user'; }
     function newOwnShop() { return request.resource.data.get('shopId', '') == myProfile().get('shopId', ''); }
 
@@ -24,6 +24,10 @@ service cloud.firestore {
       allow read: if isApproved() && (isAdmin() || !isRetailUser() || shopId == myProfile().get('shopId', ''));
       allow create, update, delete: if isAdmin();
     }
+    match /sharedData/dailyHisab/parties/{partyId} {
+      allow read: if isApproved();
+      allow create, update, delete: if isAdmin();
+    }
     match /sharedData/dailyHisab/{document=**} {
       allow read: if isApproved() && (isAdmin() || !isRetailUser() || resource.data.get('shopId', '') == myProfile().get('shopId', '') || resource.data.get('retailShopId', '') == myProfile().get('shopId', ''));
       allow create: if isApproved() && request.resource.data.get('createdBy', '') == request.auth.uid && request.resource.data.get('deletionRequested', false) == false && (!isRetailUser() || newOwnShop());
@@ -34,10 +38,7 @@ service cloud.firestore {
     }
 
     match /changeRequests/{requestId} {
-      allow create: if isApproved()
-        && request.resource.data.get('requestedBy', '') == request.auth.uid
-        && request.resource.data.get('status', '') == 'pending'
-        && request.resource.data.get('action', '') in ['edit', 'delete'];
+      allow create: if isApproved() && request.resource.data.get('requestedBy', '') == request.auth.uid && request.resource.data.get('status', '') == 'pending' && request.resource.data.get('action', '') in ['edit', 'delete'];
       allow get, list: if isAdmin();
       allow update, delete: if isAdmin();
     }
